@@ -8,10 +8,15 @@ It is not ready for marketplace publication. Publication is blocked until the lo
 
 ## What it controls
 
-```text
-request -> concise generation -> artifact/subagent gates -> safe display -> developer
-                                      |                      |
-                                      +-- retry if bloated    +-- original on failure
+```mermaid
+flowchart LR
+    U[Request] --> C[Concise generation]
+    C --> G{Artifact and subagent gates}
+    G -->|Accept| D[Safe display]
+    G -->|Repair| C
+    D -->|Concise| R[Developer]
+    D -->|Failure| O[Original output]
+    O --> R
 ```
 
 - A forced output style removes routine preamble and narration.
