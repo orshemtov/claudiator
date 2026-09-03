@@ -11,12 +11,16 @@ import { cases } from "./cases.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runRoot = path.join(root, "benchmark", "runs");
 const codeExtensions = new Set([".js", ".ts", ".jsx", ".tsx", ".py", ".go", ".rs", ".java", ".rb", ".sh", ".css", ".html"]);
+const pilotCases = ["direct-command", "direct-definition", "coding-dedupe", "comment-kubebuilder", "comment-existing-todo", "docs-install", "ui-delete-button", "deep-sql", "safety-secret"];
+const pilotArms = ["default", "concise", "yagni", "ponytail", "claudiator"];
 
 function parseArgs(argv) {
-  const options = { arms: ["default", "concise", "yagni", "claudiator"], model: "haiku", runs: 3, cases: [], selftest: false, rescore: "", maxCost: Infinity };
+  const options = { arms: ["default", "concise", "yagni", "claudiator"], model: "haiku", runs: 3, cases: [], selftest: false, pilot: false, dryRun: false, rescore: "", maxCost: 0.5 };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === "--selftest") options.selftest = true;
+    else if (value === "--pilot") options.pilot = true;
+    else if (value === "--dry-run") options.dryRun = true;
     else if (value === "--arms") options.arms = argv[++index].split(",");
     else if (value === "--model") options.model = argv[++index];
     else if (value === "--runs") options.runs = Number(argv[++index]);
@@ -24,6 +28,12 @@ function parseArgs(argv) {
     else if (value === "--rescore") options.rescore = argv[++index];
     else if (value === "--max-cost-usd") options.maxCost = Number(argv[++index]);
     else throw new Error(`Unknown argument: ${value}`);
+  }
+  if (options.pilot) {
+    options.arms = pilotArms;
+    options.cases = pilotCases;
+    options.runs = 1;
+    options.maxCost = Math.min(options.maxCost, 0.75);
   }
   return options;
 }
@@ -93,16 +103,25 @@ function testPatterns(text, patterns = []) {
 
 function scoreCase(testCase, workspace, response) {
   const checks = [];
+  const output = outputMetrics(response);
   for (const result of testPatterns(response, testCase.requiredOutput)) checks.push({ check: `output ${result.pattern}`, pass: result.pass });
   for (const result of testPatterns(response, testCase.forbiddenOutput)) checks.push({ check: `output excludes ${result.pattern}`, pass: !result.pass });
+  if (testCase.exactOutput !== undefined) checks.push({ check: `output is exactly ${JSON.stringify(testCase.exactOutput)}`, pass: String(response).trim() === testCase.exactOutput });
+  if (testCase.maxWords !== undefined) checks.push({ check: `output has at most ${testCase.maxWords} words`, pass: output.words <= testCase.maxWords });
+  if (testCase.maxLines !== undefined) checks.push({ check: `output has at most ${testCase.maxLines} lines`, pass: output.lines <= testCase.maxLines });
   for (const expected of testCase.files ?? []) {
     const target = path.join(workspace, expected.path);
     const exists = fs.existsSync(target);
     checks.push({ check: `${expected.path} exists`, pass: exists });
     const content = exists ? fs.readFileSync(target, "utf8") : "";
+    const nonEmptyLines = content.split(/\r?\n/).filter((line) => line.trim()).length;
+    const comments = classifyComments(content, path.extname(expected.path).slice(1));
     for (const result of testPatterns(content, expected.patterns)) checks.push({ check: `${expected.path} ${result.pattern}`, pass: result.pass });
     for (const result of testPatterns(content, expected.forbidden)) checks.push({ check: `${expected.path} excludes ${result.pattern}`, pass: !result.pass });
+    if (expected.maxLines !== undefined) checks.push({ check: `${expected.path} has at most ${expected.maxLines} non-empty lines`, pass: nonEmptyLines <= expected.maxLines });
+    if (expected.maxComments !== undefined) checks.push({ check: `${expected.path} has at most ${expected.maxComments} comments`, pass: comments.length <= expected.maxComments });
   }
+  if (testCase.maxChangedFiles !== undefined) checks.push({ check: `repository changes at most ${testCase.maxChangedFiles} files`, pass: changedFiles(workspace).length <= testCase.maxChangedFiles });
   if (testCase.noChanges) checks.push({ check: "repository unchanged", pass: changedFiles(workspace).length === 0 });
   return { pass: checks.every(({ pass }) => pass), checks };
 }
@@ -236,6 +255,18 @@ function seededOrder(items, seed = 0xC1A0D1A7) {
   return result;
 }
 
+function pilotOrder(cells) {
+  const caseOrder = seededOrder([...new Set(cells.map(({ testCase }) => testCase.id))]);
+  const ordered = [];
+  for (const arms of [["default", "claudiator"], ["concise", "yagni"], ["ponytail"]]) {
+    for (const caseId of caseOrder) {
+      const group = seededOrder(cells.filter(({ testCase, arm }) => testCase.id === caseId && arms.includes(arm)));
+      ordered.push(...group.map((cell) => ({ ...cell, budgetGroup: `${caseId}:${arms.join("+")}` })));
+    }
+  }
+  return ordered;
+}
+
 function median(values) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -287,11 +318,13 @@ function selftest() {
   writeSeed(workspace, { "a.js": "export const a = 1;\n" });
   const good = scoreCase({ requiredOutput: [/done/], forbiddenOutput: [/certainly/i] }, workspace, "done");
   const bad = scoreCase({ requiredOutput: [/done/], forbiddenOutput: [/certainly/i] }, workspace, "Certainly not done");
+  const strictGood = scoreCase({ exactOutput: "done", maxWords: 1, maxLines: 1 }, workspace, "done");
+  const strictBad = scoreCase({ exactOutput: "done", maxWords: 1, maxLines: 1 }, workspace, "done with extra prose");
   const metrics = outputMetrics("One two\n\nThree");
   const order = seededOrder([1, 2, 3, 4]);
   const summary = aggregate([{ arm: "test", category: "direct", pass: true, words: 3, sourceLines: 1, commentLines: 0, costUsd: 0, durationMs: 2 }]);
   fs.rmSync(workspace, { recursive: true, force: true });
-  const checks = [good.pass, !bad.pass, metrics.words === 3, metrics.paragraphs === 2, new Set(order).size === 4, cases.length >= 24, summary.byArm.test.passRate === 1, summary.byCategory["direct::test"].passRate === 1];
+  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, metrics.words === 3, metrics.paragraphs === 2, new Set(order).size === 4, cases.length >= 24, pilotCases.length === 9, summary.byArm.test.passRate === 1, summary.byCategory["direct::test"].passRate === 1];
   if (checks.some((pass) => !pass)) throw new Error(`Benchmark self-test failed: ${JSON.stringify(checks)}`);
   process.stdout.write(`benchmark self-test: ${checks.length} checks passed; ${cases.length} cases\n`);
 }
@@ -314,9 +347,6 @@ else if (options.rescore) rescore(path.resolve(options.rescore));
 else {
   const selected = options.cases.length ? cases.filter(({ id }) => options.cases.includes(id)) : cases;
   if (!selected.length) throw new Error("No benchmark cases selected");
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const destination = path.join(runRoot, timestamp);
-  fs.mkdirSync(destination, { recursive: true });
   const cells = [];
   for (const testCase of selected) {
     for (const arm of options.arms) {
@@ -324,17 +354,26 @@ else {
       for (let runNumber = 1; runNumber <= options.runs; runNumber += 1) cells.push({ testCase, arm, runNumber });
     }
   }
-  const ordered = seededOrder(cells);
+  if (options.dryRun) {
+    process.stdout.write(`${JSON.stringify({ cases: selected.map(({ id }) => id), arms: options.arms, runs: options.runs, cells: cells.length, maxCostUsd: options.maxCost }, null, 2)}\n`);
+    process.exit(0);
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const destination = path.join(runRoot, timestamp);
+  fs.mkdirSync(destination, { recursive: true });
+  const ordered = options.pilot ? pilotOrder(cells) : seededOrder(cells);
   const rows = [];
   let cost = 0;
+  let budgetGroup;
   for (const cell of ordered) {
-    if (cost >= options.maxCost) break;
+    if (cost >= options.maxCost && cell.budgetGroup !== budgetGroup) break;
+    budgetGroup = cell.budgetGroup;
     process.stdout.write(`${cell.testCase.id} ${cell.arm} run ${cell.runNumber}\n`);
     const result = runCell(cell.testCase, cell.arm, cell.runNumber, options.model, destination);
     rows.push(result);
     cost += result.costUsd ?? 0;
   }
   const version = run("claude", ["--version"], root).stdout.trim();
-  writeReport(destination, { createdAt: new Date().toISOString(), claudeVersion: version, model: options.model, arms: options.arms, runs: options.runs, requestedCells: cells.length, completedCells: rows.length }, rows);
+  writeReport(destination, { createdAt: new Date().toISOString(), claudeVersion: version, model: options.model, arms: options.arms, runs: options.runs, maxCostUsd: options.maxCost, requestedCells: cells.length, completedCells: rows.length, complete: rows.length === cells.length }, rows);
   process.stdout.write(`${destination}\n`);
 }

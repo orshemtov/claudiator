@@ -22,6 +22,8 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("Explain this thoroughly").depth, "detailed");
   assert.equal(deriveContract("Fix the typo").depth, "minimum");
   assert.equal(deriveContract("Give only the single command").strict, true);
+  assert.equal(deriveContract("State the immediate action compactly").strict, true);
+  assert.equal(deriveContract("State the immediate action compactly").wordLimit, 12);
 });
 
 test("classifyComments protects tooling and rejects narration", () => {

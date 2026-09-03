@@ -5,7 +5,8 @@ const DETAIL_RE = /\b(thorough|thoroughly|detailed|deep(?:ly)?|walkthrough|teach
 const TABLE_RE = /\b(compare|comparison|versus|vs\.?|options|matrix|trade[- ]offs?)\b/i;
 const DIAGRAM_RE = /\b(flow|architecture|hierarchy|diagram|pipeline|sequence)\b/i;
 const LIST_RE = /\b(list|steps|several|checklist|requirements)\b/i;
-const STRICT_FORMAT_RE = /\b(?:only|just|single|exactly|nothing else)\b/i;
+const STRICT_FORMAT_RE = /\b(?:only|just|single|exactly|nothing else|compact(?:ly)?|concise(?:ly)?|brief(?:ly)?)\b/i;
+const COMPACT_RE = /\b(?:compact(?:ly)?|concise(?:ly)?|brief(?:ly)?)\b/i;
 const FILLER_LINE_RE = /^\s*(?:sure|certainly|absolutely|of course)[!.:,\s]*$/i;
 const NARRATION_LINE_RE = /^\s*(?:i(?:'ll| will| am going to)|let me)\b/i;
 const CLOSING_LINE_RE = /^\s*(?:let me know if|hope this helps|feel free to ask|if you(?:'d| would) like,? i can)\b.*[.!]?\s*$/i;
@@ -20,12 +21,13 @@ const COMMENTED_CODE_RE = /^(?:const|let|var|if|for|while|return|function|class|
 export function deriveContract(prompt = "") {
   const depth = DETAIL_RE.test(prompt) ? "detailed" : "minimum";
   const strict = STRICT_FORMAT_RE.test(prompt);
+  const wordLimit = COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined;
   let representation = "sentence";
   if (/\bmermaid\b/i.test(prompt)) representation = "mermaid";
   else if (TABLE_RE.test(prompt)) representation = "table";
   else if (DIAGRAM_RE.test(prompt)) representation = "ascii";
   else if (LIST_RE.test(prompt)) representation = "bullets";
-  return { depth, representation, strict };
+  return { depth, representation, strict, wordLimit };
 }
 
 function commentText(line) {
@@ -234,7 +236,8 @@ function contextFor(contract) {
   const constraint = contract.strict
     ? " The requested quantity or format is strict: return exactly that, with no qualification, alternative, or adjacent advice."
     : "";
-  return `${depth}${constraint}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
+  const limit = contract.wordLimit ? ` Hard limit: ${contract.wordLimit} words.` : "";
+  return `${depth}${constraint}${limit}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 
 function output(event, fields) {

@@ -87,7 +87,7 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Plugin manifest and local marketplace | Implemented |
 | Generation, artifact, subagent, and display hooks | Implemented |
 | Protected-comment tests | Implemented |
-| Native eval suite | Authored; pilot required |
-| Comparative 24-case corpus | Authored; pilot required |
+| Native eval suite | Authored; native runner account-gated |
+| Comparative 24-case corpus | Pilot underway |
 | Frozen thresholds and holdout | Not started |
 | Marketplace publication | Blocked |

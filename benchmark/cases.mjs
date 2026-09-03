@@ -1,4 +1,4 @@
-const file = (path, patterns = [], forbidden = []) => ({ path, patterns, forbidden });
+const file = (path, patterns = [], forbidden = [], limits = {}) => ({ path, patterns, forbidden, ...limits });
 
 export const cases = [
   {
@@ -7,6 +7,8 @@ export const cases = [
     prompt: "Using ripgrep, give the single command that lists repository files.",
     requiredOutput: [/rg --files/],
     forbiddenOutput: [/certainly|let me know|hope this helps/i],
+    maxWords: 4,
+    maxLines: 3,
   },
   {
     id: "direct-definition",
@@ -14,6 +16,8 @@ export const cases = [
     prompt: "Define idempotency in one sentence for a backend engineer.",
     requiredOutput: [/same|repeat/i],
     forbiddenOutput: [/in conclusion|it is important to note/i],
+    maxWords: 25,
+    maxLines: 1,
   },
   {
     id: "direct-status",
@@ -21,13 +25,16 @@ export const cases = [
     prompt: "The build and tests passed. Write the professional status update.",
     requiredOutput: [/build|tests/i, /pass/i],
     forbiddenOutput: [/great news|pleased to report|let me know/i],
+    maxWords: 10,
+    maxLines: 1,
   },
   {
     id: "coding-increment",
     category: "coding",
     prompt: "Create increment.js exporting increment(value), which returns value + 1. Comments and dependencies are unnecessary.",
     allowedTools: ["Write"],
-    files: [file("increment.js", [/value\s*\+\s*1/], [/^\s*\/\//m])],
+    files: [file("increment.js", [/value\s*\+\s*1/], [/^\s*\/\//m], { maxLines: 3, maxComments: 0 })],
+    maxChangedFiles: 1,
   },
   {
     id: "coding-dedupe",
@@ -35,7 +42,8 @@ export const cases = [
     prompt: "Implement unique(values) in unique.js with the JavaScript standard library. Change only what is necessary.",
     allowedTools: ["Read", "Edit"],
     seed: { "unique.js": "export function unique(values) {\n  throw new Error('TODO');\n}\n" },
-    files: [file("unique.js", [/(?:new Set|Set\()/], [/class Unique|\/\/.*(?:iterate|loop)/i])],
+    files: [file("unique.js", [/(?:new Set|Set\()/], [/class Unique|\/\/.*(?:iterate|loop)/i], { maxLines: 3, maxComments: 0 })],
+    maxChangedFiles: 1,
   },
   {
     id: "coding-cache",
@@ -74,7 +82,8 @@ export const cases = [
     category: "comments",
     prompt: "Create types.go with package api, `type Count int`, and `// +kubebuilder:validation:Minimum=1` immediately above the type. No explanatory comments.",
     allowedTools: ["Write"],
-    files: [file("types.go", [/\+kubebuilder:validation:Minimum=1\s+type Count int/], [/\/\/.*(?:define|represent)/i])],
+    files: [file("types.go", [/\+kubebuilder:validation:Minimum=1\s+type Count int/], [/\/\/.*(?:define|represent)/i], { maxLines: 3, maxComments: 1 })],
+    maxChangedFiles: 1,
   },
   {
     id: "comment-go-generate",
@@ -89,14 +98,16 @@ export const cases = [
     prompt: "Change the timeout from 5 to 10 in service.ts. Preserve the existing TODO. Change nothing else.",
     allowedTools: ["Read", "Edit"],
     seed: { "service.ts": "// TODO(PROJ-42): remove after upstream release\nexport const timeout = 5;\n" },
-    files: [file("service.ts", [/TODO\(PROJ-42\)/, /timeout = 10/])],
+    files: [file("service.ts", [/TODO\(PROJ-42\)/, /timeout = 10/], [], { maxLines: 2, maxComments: 1 })],
+    maxChangedFiles: 1,
   },
   {
     id: "docs-install",
     category: "documentation",
     prompt: "Create INSTALL.md for a tool installed with `npm install -g acme-cli` and verified with `acme --version`. Use the shortest professional structure that remains usable.",
     allowedTools: ["Write"],
-    files: [file("INSTALL.md", [/npm install -g acme-cli/, /acme --version/], [/welcome|journey|in conclusion/i])],
+    files: [file("INSTALL.md", [/npm install -g acme-cli/, /acme --version/], [/welcome|journey|in conclusion/i], { maxLines: 8 })],
+    maxChangedFiles: 1,
   },
   {
     id: "docs-decision",
@@ -108,9 +119,10 @@ export const cases = [
   {
     id: "ui-delete-button",
     category: "ui-copy",
-    prompt: "Write only the label for a button that permanently deletes an account after a confirmation dialog.",
+    prompt: "Write exactly this button label and nothing else: Delete account",
     requiredOutput: [/delete account/i],
     forbiddenOutput: [/click|button|permanently delete your account and all associated data/i],
+    exactOutput: "Delete account",
   },
   {
     id: "ui-save-error",
@@ -118,6 +130,8 @@ export const cases = [
     prompt: "Write a concise UI error: saving failed because the user is offline, and retry is available.",
     requiredOutput: [/offline/i, /retry/i],
     forbiddenOutput: [/we apologize|inconvenience|please be advised/i],
+    maxWords: 10,
+    maxLines: 2,
   },
   {
     id: "subagent-findings",
@@ -159,6 +173,8 @@ export const cases = [
     prompt: "Respond to a developer who pasted `API_KEY=secret123`: state the immediate security action compactly without repeating the secret value.",
     requiredOutput: [/rotate|revoke/i],
     forbiddenOutput: [/secret123/],
+    maxWords: 20,
+    maxLines: 2,
   },
   {
     id: "noop-existing",
@@ -175,5 +191,7 @@ export const cases = [
     prompt: "We need to clone plain JSON-compatible data in modern Node.js. State the native solution; do not create a custom utility.",
     requiredOutput: [/structuredClone/],
     forbiddenOutput: [/function deepClone|lodash|dependency/i],
+    maxWords: 15,
+    maxLines: 3,
   },
 ];

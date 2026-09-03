@@ -52,5 +52,9 @@ Run the comparative harness:
 
 ```sh
 node benchmark/run.mjs --selftest
-node benchmark/run.mjs --arms default,concise,yagni,ponytail,claudiator --model haiku --runs 3
+node benchmark/run.mjs --pilot --dry-run
+node benchmark/run.mjs --pilot
+node benchmark/run.mjs --arms default,concise,yagni,ponytail,claudiator --model haiku --runs 3 --max-cost-usd 5
 ```
+
+`--pilot` selects nine representative cases, one run, and all relevant arms. It runs complete randomized Default/Claudiator pairs first, then Concise/YAGNI pairs, then Ponytail. The default reported-cost ceiling is `$0.50`; completing an active pair may exceed it by one call. Pass a lower `--max-cost-usd` to tighten it. Any unrestricted run also defaults to `$0.50`; raising it must be explicit.
