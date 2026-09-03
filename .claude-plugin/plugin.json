@@ -1,0 +1,30 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "claudiator",
+  "version": "0.1.0",
+  "description": "Minimum-sufficient Claude Code output without losing correctness, warnings, or meaningful code comments.",
+  "author": {
+    "name": "Or Shemtov"
+  },
+  "license": "MIT",
+  "userConfig": {
+    "semantic_renderer": {
+      "type": "boolean",
+      "title": "Semantic display compression",
+      "description": "Use a separate Anthropic API call to compress complete assistant messages before display.",
+      "default": false
+    },
+    "api_key": {
+      "type": "string",
+      "title": "Anthropic API key",
+      "description": "Required only for semantic display compression.",
+      "sensitive": true
+    },
+    "semantic_model": {
+      "type": "string",
+      "title": "Semantic compression model",
+      "description": "Anthropic model used for optional display compression.",
+      "default": "claude-haiku-4-5-20251001"
+    }
+  }
+}

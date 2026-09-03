@@ -1,0 +1,5 @@
+evals/results/
+benchmark/runs/
+node_modules/
+.DS_Store
+*.log

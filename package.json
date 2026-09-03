@@ -1,0 +1,14 @@
+{
+  "name": "claudiator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "npm test && claude plugin validate --strict .",
+    "benchmark:selftest": "node benchmark/run.mjs --selftest"
+  }
+}

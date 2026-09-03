@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claudiator",
+  "description": "Less AI prose. More signal.",
+  "owner": {
+    "name": "Or Shemtov"
+  },
+  "plugins": [
+    {
+      "name": "claudiator",
+      "description": "Reduces conversational and codebase verbosity while preserving required information.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

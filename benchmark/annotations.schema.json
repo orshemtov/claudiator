@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Claudiator blinded human annotation",
+  "type": "object",
+  "required": ["case", "response_id", "annotator", "required", "removable", "correct", "comprehension_ms"],
+  "properties": {
+    "case": { "type": "string" },
+    "response_id": { "type": "string" },
+    "annotator": { "type": "string" },
+    "required": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "removable": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "correct": { "type": "boolean" },
+    "comprehension_ms": { "type": "integer", "minimum": 0 },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "required": ["start", "end", "reason"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

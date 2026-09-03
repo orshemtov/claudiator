@@ -1,0 +1,85 @@
+{
+  "description": "Claudiator generation, artifact, subagent, and display controls",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/claudiator.mjs"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/claudiator.mjs"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "model": "haiku",
+            "timeout": 20,
+            "prompt": "Judge the subagent's final report in $ARGUMENTS. If stop_hook_active is true, return {\"ok\":true}. Otherwise require a minimum-sufficient report containing findings, exact evidence, changes, and unresolved risks that actually exist. Reject preamble, narration, repeated conclusions, implementation history, and obvious explanation. Do not reject necessary warnings, uncertainty, commands, paths, or requested detail. Return {\"ok\":false,\"reason\":\"Rewrite once as compact bullets or a table; preserve: ...; remove: ...\"} only when repair is useful. Return {\"ok\":true} when sufficient and concise."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit|mcp__.*__(?:write|create|update).*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/claudiator.mjs"],
+            "timeout": 5
+          },
+          {
+            "type": "prompt",
+            "model": "haiku",
+            "timeout": 20,
+            "continueOnBlock": true,
+            "prompt": "Review only the proposed new content in $ARGUMENTS. Return {\"ok\":false,\"reason\":\"...\"} when it adds unnecessary narration, repetition, speculative code, files, dependencies, abstractions, verbose UI copy, or comments that merely explain syntax/history/obvious behavior. Preserve compiler/tool/codegen/schema/lint directives, required docstrings, existing TODO/FIXME markers, and comments for a current non-obvious invariant, safety rule, or workaround. Do not demand comments, tests, or abstractions not requested. If uncertain, return {\"ok\":true}."
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/claudiator.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/claudiator.mjs"],
+            "timeout": 1
+          }
+        ]
+      }
+    ]
+  }
+}
