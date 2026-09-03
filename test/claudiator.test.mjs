@@ -21,6 +21,7 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("Show the request flow in Claude Code").representation, "ascii");
   assert.equal(deriveContract("Explain this thoroughly").depth, "detailed");
   assert.equal(deriveContract("Fix the typo").depth, "minimum");
+  assert.equal(deriveContract("Give only the single command").strict, true);
 });
 
 test("classifyComments protects tooling and rejects narration", () => {

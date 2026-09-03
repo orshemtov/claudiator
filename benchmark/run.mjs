@@ -144,6 +144,8 @@ function parseClaudeJson(stdout) {
     turns: body.num_turns ?? 0,
     usage: body.usage ?? {},
     sessionId: body.session_id,
+    isError: Boolean(body.is_error),
+    error: body.is_error ? body.result || body.terminal_reason || "Claude returned an error" : "",
   };
 }
 
@@ -159,10 +161,8 @@ function capturedMessage(file, fallback) {
 
 function runCell(testCase, arm, runNumber, model, destination) {
   const workspace = path.join(destination, "workspaces", testCase.id, arm, String(runNumber));
-  const configDir = path.join(destination, "configs", testCase.id, arm, String(runNumber));
   const captureFile = path.join(destination, "messages", `${testCase.id}__${arm}__${runNumber}.jsonl`);
   writeSeed(workspace, testCase.seed);
-  fs.mkdirSync(configDir, { recursive: true });
   const treatment = armArgs(arm);
   const tools = [...new Set(testCase.allowedTools ?? ["Read", "Glob", "Grep"])];
   const args = [
@@ -172,6 +172,7 @@ function runCell(testCase, arm, runNumber, model, destination) {
     "--permission-mode", "bypassPermissions",
     "--setting-sources", "project,local",
     "--strict-mcp-config",
+    "--disable-slash-commands",
     "--no-session-persistence",
     "--allowedTools", ...tools,
     "--disallowedTools", "Bash", "PowerShell", "WebFetch", "WebSearch",
@@ -180,7 +181,6 @@ function runCell(testCase, arm, runNumber, model, destination) {
   const started = Date.now();
   const benchmarkEnv = {
     ...process.env,
-    CLAUDE_CONFIG_DIR: configDir,
     ...treatment.env,
     ...(arm.startsWith("claudiator") ? { CLAUDIATOR_BENCHMARK_CAPTURE_FILE: captureFile } : {}),
   };
@@ -189,9 +189,16 @@ function runCell(testCase, arm, runNumber, model, destination) {
   fs.mkdirSync(path.dirname(rawFile), { recursive: true });
   fs.writeFileSync(rawFile, child.stdout || JSON.stringify({ error: child.stderr, status: child.status }));
   if (child.status !== 0) {
-    return { case: testCase.id, category: testCase.category, arm, run: runNumber, pass: false, error: child.stderr.trim(), wallMs: Date.now() - started };
+    let error = child.stderr.trim();
+    try {
+      error ||= parseClaudeJson(child.stdout).error;
+    } catch {}
+    return { case: testCase.id, category: testCase.category, arm, run: runNumber, pass: false, error: error || `Claude exited ${child.status}`, wallMs: Date.now() - started };
   }
   const parsed = parseClaudeJson(child.stdout);
+  if (parsed.isError) {
+    return { case: testCase.id, category: testCase.category, arm, run: runNumber, pass: false, error: parsed.error, wallMs: Date.now() - started };
+  }
   const messages = capturedMessage(captureFile, parsed.response);
   const score = scoreCase(testCase, workspace, messages.displayedResponse);
   const diffFile = path.join(destination, "diffs", `${testCase.id}__${arm}__${runNumber}.patch`);

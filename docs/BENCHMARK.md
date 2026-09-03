@@ -15,7 +15,7 @@ With the same Claude Code build, primary model, task, tools, and starting reposi
 | `claudiator` | Full local Claudiator treatment |
 | `claudiator-semantic` | Claudiator with opt-in semantic display compression |
 
-Each cell runs in a fresh workspace and `CLAUDE_CONFIG_DIR`. Arm order is seeded and randomized. The harness records Claude's JSON result, Claudiator's raw and displayed messages, repository patch, token usage, cost, duration, and turns. Raw CLI output is retained for audit. Non-Claudiator arms use their CLI result for both raw and displayed output because they have no Claudiator display hook.
+Each cell runs in a fresh workspace. Authentication comes from the host Claude profile, while `--setting-sources project,local`, `--strict-mcp-config`, and `--disable-slash-commands` exclude user settings, MCP servers, skills, and installed plugins. Only the treatment passed with `--plugin-dir` loads; verify this in startup logs after Claude Code upgrades. Arm order is seeded and randomized. The harness records Claude's JSON result, Claudiator's raw and displayed messages, repository patch, token usage, cost, duration, and turns. Raw CLI output is retained for audit. Non-Claudiator arms use their CLI result for both raw and displayed output because they have no Claudiator display hook.
 
 Benchmark capture contains task content and is enabled only inside the generated, gitignored run directory. It is separate from production telemetry.
 
