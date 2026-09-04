@@ -80,7 +80,7 @@ Run the cheap native eval pilot:
 claude plugin eval . --case 01-direct-command --runs 1 --ablation with-without --no-scaffold --no-publish --model haiku --max-cost-usd 0.50
 ```
 
-See [docs/BENCHMARK.md](docs/BENCHMARK.md) for the controlled comparison and [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) for the marketplace gate.
+See [docs/BENCHMARK.md](docs/BENCHMARK.md) for the controlled comparison, [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) for the marketplace gate, and the [first locked holdout report](docs/results/MICRO-HOLDOUT-2026-09-04.md) for current evidence.
 
 ## Privacy
 
@@ -95,5 +95,5 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Protected-comment tests | Implemented |
 | Native eval suite | Authored; native runner account-gated |
 | Comparative corpus | 24 broad cases plus 12-case micro train/holdout gate |
-| Frozen thresholds and holdout | Micro thresholds frozen; holdout fingerprinted and unopened |
+| Micro holdout | Failed 13/18; retired and reported transparently |
 | Marketplace publication | Blocked |

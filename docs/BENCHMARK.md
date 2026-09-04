@@ -88,3 +88,5 @@ node benchmark/run.mjs --resume benchmark/runs/RUN_DIRECTORY --suite micro-train
 ```
 
 After the micro holdout passes, advance to small deterministic greenfield, brownfield, bug-fix, investigation, and no-op repository tasks. Full FastAPI or Express builds are demonstration-scale confirmation, not the first proof.
+
+The first locked micro holdout did not pass and is retired. Its unchanged formal result is published in [results/MICRO-HOLDOUT-2026-09-04.md](results/MICRO-HOLDOUT-2026-09-04.md).
