@@ -197,12 +197,16 @@ function capturedMessage(file, fallback) {
   return { rawResponse, displayedResponse };
 }
 
+function toolArgs(allowedTools) {
+  const tools = [...new Set(allowedTools ?? ["Read", "Glob", "Grep"])];
+  return tools.length ? ["--allowedTools", ...tools] : ["--tools", ""];
+}
+
 function runCell(testCase, arm, runNumber, model, destination) {
   const workspace = path.join(destination, "workspaces", testCase.id, arm, String(runNumber));
   const captureFile = path.join(destination, "messages", `${testCase.id}__${arm}__${runNumber}.jsonl`);
   writeSeed(workspace, testCase.seed);
   const treatment = armArgs(arm);
-  const tools = [...new Set(testCase.allowedTools ?? ["Read", "Glob", "Grep"])];
   const args = [
     "-p", testCase.prompt,
     "--output-format", "json",
@@ -212,7 +216,7 @@ function runCell(testCase, arm, runNumber, model, destination) {
     "--strict-mcp-config",
     "--disable-slash-commands",
     "--no-session-persistence",
-    "--allowedTools", ...tools,
+    ...toolArgs(testCase.allowedTools),
     "--disallowedTools", "Bash", "PowerShell", "WebFetch", "WebSearch",
     ...treatment.args,
   ];
@@ -398,9 +402,11 @@ function selftest() {
     { case: "unpaired", run: 1, arm: "claudiator", category: "direct", pass: true, words: 1, sourceLines: 0, commentLines: 0, costUsd: 0, durationMs: 2 },
   ]);
   const holdout = cases.filter(({ suite }) => suite === "micro-holdout");
+  const independentHoldout = cases.filter(({ suite }) => suite === "independent-holdout");
   const lockedDigest = fs.readFileSync(path.join(root, "benchmark", "micro-holdout.sha256"), "utf8").trim();
+  const independentDigest = fs.readFileSync(path.join(root, "benchmark", "independent-holdout.sha256"), "utf8").trim();
   fs.rmSync(workspace, { recursive: true, force: true });
-  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, depthGood.pass, !depthBad.pass, equivalent.pass, mixed.contentPass && !mixed.presentationPass && !mixed.pass, metrics.words === 3, metrics.paragraphs === 2, fencedMetrics.words === 3, fencedMetrics.lines === 3, new Set(order).size === 4, orderedCells.slice(0, 2).every(({ budgetGroup }) => budgetGroup === "a:1:default+claudiator"), orderedCells.at(-1).arm === "concise", cases.length >= 42, pilotCases.length === 9, microSuites["micro-train"].length === 6, microSuites["micro-next-train"].length === 6, holdout.length === 6, caseFingerprint(holdout) === lockedDigest, summary.pairedVsDefault.claudiator.pairs === 1, summary.pairedVsDefault.claudiator.reduciblePairs === 1, summary.pairedVsDefault.claudiator.medianReducibleWordReductionPct === 50, summary.pairedVsConcise.claudiator.medianReducibleWordReductionPct === 37.5];
+  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, depthGood.pass, !depthBad.pass, equivalent.pass, mixed.contentPass && !mixed.presentationPass && !mixed.pass, metrics.words === 3, metrics.paragraphs === 2, fencedMetrics.words === 3, fencedMetrics.lines === 3, new Set(order).size === 4, orderedCells.slice(0, 2).every(({ budgetGroup }) => budgetGroup === "a:1:default+claudiator"), orderedCells.at(-1).arm === "concise", JSON.stringify(toolArgs([])) === JSON.stringify(["--tools", ""]), JSON.stringify(toolArgs(["Read", "Read"])) === JSON.stringify(["--allowedTools", "Read"]), cases.length >= 48, new Set(cases.map(({ id }) => id)).size === cases.length, pilotCases.length === 9, microSuites["micro-train"].length === 6, microSuites["micro-next-train"].length === 6, holdout.length === 6, caseFingerprint(holdout) === lockedDigest, independentHoldout.length === 6, caseFingerprint(independentHoldout) === independentDigest, summary.pairedVsDefault.claudiator.pairs === 1, summary.pairedVsDefault.claudiator.reduciblePairs === 1, summary.pairedVsDefault.claudiator.medianReducibleWordReductionPct === 50, summary.pairedVsConcise.claudiator.medianReducibleWordReductionPct === 37.5];
   if (checks.some((pass) => !pass)) throw new Error(`Benchmark self-test failed: ${JSON.stringify(checks)}`);
   process.stdout.write(`benchmark self-test: ${checks.length} checks passed; ${cases.length} cases\n`);
 }

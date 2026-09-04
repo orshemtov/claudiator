@@ -74,6 +74,7 @@ node benchmark/run.mjs --suite micro-train --arms default,claudiator --model hai
 node benchmark/run.mjs --suite micro-train --arms default,claudiator --model haiku --runs 1 --max-cost-usd 0.25
 node benchmark/run.mjs --suite micro-train --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1
 node benchmark/run.mjs --suite micro-holdout --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1
+node benchmark/run.mjs --suite independent-holdout --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1.25
 node benchmark/run.mjs --pilot --dry-run
 node benchmark/run.mjs --pilot
 node benchmark/run.mjs --arms default,concise,yagni,ponytail,claudiator --model haiku --runs 3 --max-cost-usd 5

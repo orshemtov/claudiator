@@ -1,3 +1,5 @@
+import { independentHoldoutCases } from "./independent-holdout.mjs";
+
 const file = (path, patterns = [], forbidden = [], limits = {}) => ({ path, patterns, forbidden, ...limits });
 
 export const cases = [
@@ -371,10 +373,12 @@ export const cases = [
     requiredOutput: [/eventual consistency/i, /stale/i, /[-+|v<>]/, /trade-?off|latency|consistency/i],
     minWords: 150,
   },
+  ...independentHoldoutCases,
 ];
 
 export const microSuites = {
   "micro-train": cases.filter(({ suite }) => suite === "micro-train").map(({ id }) => id),
   "micro-holdout": cases.filter(({ suite }) => suite === "micro-holdout").map(({ id }) => id),
   "micro-next-train": cases.filter(({ suite }) => suite === "micro-next-train").map(({ id }) => id),
+  "independent-holdout": cases.filter(({ suite }) => suite === "independent-holdout").map(({ id }) => id),
 };

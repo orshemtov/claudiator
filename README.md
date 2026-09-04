@@ -68,7 +68,7 @@ npm run benchmark:selftest
 claude plugin validate --strict .
 ```
 
-Run the low-cost training gate before opening its locked paraphrased holdout:
+Run the low-cost training gate:
 
 ```sh
 node benchmark/run.mjs --suite micro-train --arms default,claudiator --model haiku --runs 1 --max-cost-usd 0.25
@@ -94,8 +94,8 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Generation, artifact, subagent, and display hooks | Implemented |
 | Protected-comment tests | Implemented |
 | Native eval suite | Authored; native runner account-gated |
-| Comparative corpus | 24 broad cases plus 18 micro training/holdout cases |
+| Comparative corpus | 24 broad cases plus 24 micro development/holdout cases |
 | Micro holdout | Failed 13/18; retired and reported transparently |
 | Revised development gate | Claudiator 18/18; Default 9/18; Concise 10/18 |
-| Independent holdout | Required before a superiority claim |
+| Independent holdout | Frozen and unopened; six cases, 54-call maximum |
 | Marketplace publication | Blocked |

@@ -1,10 +1,37 @@
 # Evaluation preregistration
 
-Status: **revised development gate passed; independent holdout required**. Marketplace publication is blocked.
+Status: **independent micro holdout frozen and unopened**. Marketplace publication is blocked.
 
-Freeze this document after the pilot and before opening the holdout.
+## Independent micro holdout
 
-The six-case micro holdout is authored but unopened. Its case fingerprint is:
+The six cases were authored by a context-isolated agent that was forbidden from inspecting the repository, implementation, prior cases, or results. A methodology review rejected its first draft before freeze because the prompts prescribed concise outputs; the author independently replaced it with natural prompts whose hidden graders define the desired presentation.
+
+Frozen case fingerprint:
+
+```text
+608ee2d4a842890945782b669fe7832afc1f96845a3344f70393918aef092bff
+```
+
+The run is frozen at six cases, three runs, and three arms: Default, built-in Concise, and Claudiator. It uses Claude Code 2.1.259, Haiku, fresh git workspaces, isolated settings, disabled unrelated tools, randomized matched ordering, and a reported-cost ceiling of `$1.25` for at most 54 calls.
+
+This first-stage holdout passes only if:
+
+- Zero critical safety or required-information losses occur.
+- Claudiator passes all 18 content checks and all 18 presentation checks.
+- Claudiator's overall pass count exceeds both Default and Concise.
+- Median visible-word reduction across the 12 reducible matched pairs is at least 30% versus Default and at least 30% versus Concise.
+- The destructive case retains a target verification, narrowly scoped deletion command, and irreversibility warning in every run.
+- The requested-depth case is 260-520 words and retains every frozen factual requirement in every run.
+- The code case creates one dependency-free, comment-free source file in every run; the no-op case changes no files in every run.
+- All results, failures, costs, and limitations are reported without changing cases, graders, or thresholds.
+
+Passing this small deterministic gate supports funding broader application and brownfield evaluations. It does not by itself satisfy the marketplace gate or prove general superiority.
+
+## Retired first holdout
+
+This section was frozen before the original holdout opened.
+
+The original six-case micro holdout fingerprint was:
 
 ```text
 349e6aedc4389f304a696a6c7724923f026daf4c4c19f454f18049f3b612b3c3
