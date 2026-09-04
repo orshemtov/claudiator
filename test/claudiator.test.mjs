@@ -31,6 +31,20 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("Provide `docker system prune -a` with only its necessary warning.").shape, "command-warning");
   assert.equal(deriveContract("Define idempotency in one sentence.").shape, "single-sentence-definition");
   assert.equal(deriveContract("Explain thoroughly and define the term in one sentence.").shape, "default");
+  assert.deepEqual(
+    { shape: deriveContract("A batch processed 148 records and rejected 23. How many were accepted?").shape, limit: deriveContract("A batch processed 148 records and rejected 23. How many were accepted?").wordLimit },
+    { shape: "direct-answer", limit: 6 },
+  );
+  assert.equal(deriveContract("Draft an internal status update for engineers and support.").shape, "status-update");
+  assert.equal(deriveContract("Please make sure telemetry is disabled in settings.json.").shape, "change-result");
+  assert.equal(deriveContract("Add a small JavaScript utility named clamp.js.").shape, "implementation-result");
+  const destructive = deriveContract("Permanently remove /srv/app/build-cache and its nested contents. What shell commands should I use?");
+  assert.equal(destructive.shape, "destructive-command");
+  assert.equal(destructive.target, "/srv/app/build-cache");
+  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 500);
+  assert.equal(deriveContract("Give me a detailed 800-word explanation of HTTP caching.").wordLimit, 800);
+  assert.equal(deriveContract("Write a detailed 180-220 word explanation.").wordLimit, 220);
+  assert.equal(deriveContract("What is causing intermittent data loss in this distributed system?").shape, "default");
 });
 
 test("classifyComments protects tooling and rejects narration", () => {
@@ -205,6 +219,14 @@ test("strict local display buffers and selects only the contracted units", async
   await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "warning", prompt: "Give the command and the necessary warning. Add nothing else." }, {}, { store });
   const warning = await handleHook({ hook_event_name: "MessageDisplay", session_id: "warning", message_id: "m", index: 0, final: true, delta: "```sh\nrm -rf ./cache\n```\n\nThis irreversibly deletes the cache. Back it up first." }, {}, { store });
   assert.equal(warning.hookSpecificOutput.displayContent, "rm -rf ./cache\nThis irreversibly deletes the cache.");
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "answer", prompt: "A batch processed 148 records and rejected 23. How many were accepted?" }, {}, { store });
+  const answer = await handleHook({ hook_event_name: "MessageDisplay", session_id: "answer", message_id: "m", index: 0, final: true, delta: "125 records were accepted (148 - 23 = 125)." }, {}, { store });
+  assert.equal(answer.hookSpecificOutput.displayContent, "125 records were accepted.");
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "noop", prompt: "Please make sure telemetry is disabled in settings.json." }, {}, { store });
+  const noop = await handleHook({ hook_event_name: "MessageDisplay", session_id: "noop", message_id: "m", index: 0, final: true, delta: "Telemetry is already disabled in settings.json (`telemetry: false`). No changes needed." }, {}, { store });
+  assert.equal(noop.hookSpecificOutput.displayContent, "No changes needed.");
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
@@ -425,6 +447,7 @@ test("hook runner records content-free metrics", () => {
   assert.match(metrics, /"event":"MessageDisplay"/);
   assert.match(metrics, /"inputChars":/);
   assert.match(metrics, /"displayChars":/);
+  assert.match(metrics, /"shape":"default"/);
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
@@ -441,5 +464,6 @@ test("hook runner captures content only under the explicit benchmark switch", ()
   const capture = JSON.parse(fs.readFileSync(captureFile, "utf8"));
   assert.equal(capture.raw, "Certainly!\nDone.");
   assert.equal(capture.displayed, "Done.");
+  assert.equal(capture.contract.shape, "default");
   fs.rmSync(dataDir, { recursive: true, force: true });
 });

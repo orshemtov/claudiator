@@ -19,6 +19,23 @@ const NARRATIVE_RE = /^(?:this (?:function|method|class|code|block)|the followin
 const COMMENTED_CODE_RE = /^(?:const|let|var|if|for|while|return|function|class|def|import|export|[\w.]+\s*=|[\w.]+\([^)]*\);?$)/;
 const ACTION_START_RE = /^(?:immediately\s+)?(?:revoke|rotate|remove|delete|disable|stop|replace|change|restart|retry|run|contact|report|isolate|disconnect|restore|reset|cancel|close|open|use|enable|block|deny|lock|patch|upgrade|fix)\b/i;
 const DESTRUCTIVE_WARNING_RE = /\b(?:warning|delete|remove|destructive|irreversib\w*|permanent\w*|untracked|cannot be undone)\b/i;
+const DESTRUCTIVE_REQUEST_RE = /\b(?:permanently|recursive(?:ly)?|nested contents|rm\s+-[a-z]*r|delete .*cannot be undone)\b/i;
+const STATUS_REQUEST_RE = /\b(?:status|incident|service) update\b/i;
+const CHANGE_RESULT_RE = /\b(?:make sure|ensure|verify)\b[\s\S]{0,120}\b(?:disabled|enabled|configured|set|contains?)\b/i;
+const IMPLEMENTATION_RE = /\b(?:add|create|implement|fix|refactor|update)\b[\s\S]{0,160}(?:\.[a-z0-9]+\b|\bfunction\b|\bcode\b|\bfile\b|\butility\b)/i;
+const DIRECT_ANSWER_RE = /\bhow many\b|\bwhat(?:'s| is)\s+[-+*/().\d\s]+\??$/i;
+const BUFFERED_SHAPES = new Set(["single-action", "command-warning", "single-sentence-definition", "direct-answer", "status-update", "change-result", "implementation-result", "destructive-command"]);
+
+function requestedTarget(prompt) {
+  return String(prompt).match(/(?:^|[\s`'"])(\/(?:[\w.@%+~-]+\/)*[\w.@%+~-]+)/)?.[1];
+}
+
+function requestedWordLimit(prompt) {
+  const range = String(prompt).match(/\b(\d{1,5})\s*[-–]\s*(\d{1,5})[ -]words?\b/i);
+  if (range) return Number(range[2]);
+  const exact = String(prompt).match(/\b(\d{1,5})[ -]words?\b/i);
+  return exact ? Number(exact[1]) : undefined;
+}
 
 export function deriveContract(prompt = "") {
   const depth = DETAIL_RE.test(prompt) ? "detailed" : "minimum";
@@ -29,14 +46,34 @@ export function deriveContract(prompt = "") {
       ? "command-warning"
       : depth === "minimum" && /\bdefine\b/i.test(prompt) && /\bone sentence\b/i.test(prompt)
         ? "single-sentence-definition"
-      : "default";
-  const wordLimit = shape === "single-action" ? 12 : shape === "command-warning" ? 16 : shape === "single-sentence-definition" ? 20 : COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined;
+        : depth === "minimum" && DESTRUCTIVE_REQUEST_RE.test(prompt)
+          ? "destructive-command"
+          : depth === "minimum" && STATUS_REQUEST_RE.test(prompt)
+            ? "status-update"
+            : depth === "minimum" && CHANGE_RESULT_RE.test(prompt)
+              ? "change-result"
+              : depth === "minimum" && IMPLEMENTATION_RE.test(prompt)
+                ? "implementation-result"
+                : depth === "minimum" && String(prompt).length <= 300 && DIRECT_ANSWER_RE.test(prompt)
+                  ? "direct-answer"
+                  : "default";
+  const limits = {
+    "single-action": 12,
+    "command-warning": 16,
+    "single-sentence-definition": 20,
+    "direct-answer": 6,
+    "status-update": 55,
+    "change-result": 6,
+    "implementation-result": 30,
+    "destructive-command": 80,
+  };
+  const wordLimit = requestedWordLimit(prompt) ?? (depth === "detailed" ? 500 : limits[shape] ?? (COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined));
   let representation = "sentence";
   if (/\bmermaid\b/i.test(prompt)) representation = "mermaid";
   else if (TABLE_RE.test(prompt)) representation = "table";
   else if (DIAGRAM_RE.test(prompt)) representation = "ascii";
   else if (LIST_RE.test(prompt)) representation = "bullets";
-  return { depth, representation, strict, wordLimit, shape };
+  return { depth, representation, strict, wordLimit, shape, target: shape === "destructive-command" ? requestedTarget(prompt) : undefined };
 }
 
 function commentText(line) {
@@ -272,6 +309,17 @@ function strictCompress(text, contract) {
     const candidate = sentence.replace(/,\s+(?:making|ensuring|allowing|so|which|meaning)\b.*[.!?]$/i, ".");
     return candidate ? { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false } : compress(text, contract);
   }
+  if (contract.shape === "direct-answer") {
+    const sentence = firstProseSentence(text);
+    const candidate = sentence.replace(/\s*\([^()]*\)([.!?])?$/, "$1").replace(/\s+([.!?])$/, "$1");
+    return candidate ? { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false } : compress(text, contract);
+  }
+  if (contract.shape === "change-result") {
+    if (/\bno changes (?:are )?needed\b/i.test(text)) return { text: "No changes needed.", changed: text.trim() !== "No changes needed.", removedLines: 0, fallback: false };
+    const sentence = firstProseSentence(text).replace(/\s*\([^()]*\)([.!?])?$/, "$1");
+    const state = sentence.match(/^(.+?\bis already (?:disabled|enabled|configured|set))(?:\s+in\b.*)?[.!?]?$/i)?.[1];
+    if (state) return { text: `${state}.`, changed: true, removedLines: 0, fallback: false };
+  }
   return compress(text, contract);
 }
 
@@ -282,15 +330,26 @@ function contextFor(contract) {
   const constraint = contract.strict
     ? " The requested quantity or format is strict: return exactly that, with no qualification, alternative, or adjacent advice."
     : "";
-  const limit = contract.wordLimit ? ` Hard limit: ${contract.wordLimit} words.` : "";
+  const limit = contract.wordLimit ? ` Hard maximum: ${contract.wordLimit} words.` : "";
   const shape = contract.shape === "single-action"
     ? " Use one imperative sentence containing only the requested action; no checklist, follow-up, audit, or question."
     : contract.shape === "command-warning"
       ? " Use only the command and one short warning sentence; no heading, backup advice, dependency checks, or irreversible-action recap."
       : contract.shape === "single-sentence-definition"
         ? " Use one short defining sentence; omit benefits, examples, implications, and trailing commentary."
-      : "";
-  return `${depth}${constraint}${shape}${limit}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
+        : contract.shape === "direct-answer"
+          ? " Return only the answer and necessary unit; omit routine calculation and explanation."
+          : contract.shape === "status-update"
+            ? " Write one compact paragraph with every supplied impact, cause, status, and time; add no heading, audience instructions, speculation, or follow-up offer."
+            : contract.shape === "change-result"
+              ? " If no change is required, return only a short no-change confirmation; do not restate file contents."
+              : contract.shape === "implementation-result"
+                ? " After the change, report only what changed and any necessary warning or unresolved risk; do not restate the implementation."
+                : contract.shape === "destructive-command"
+                  ? ` Include a concrete command that resolves or verifies the exact target${contract.target ? ` ${contract.target}` : ""}, use an option terminator before the target, and state that deletion is irreversible. Do not replace verification with generic advice.`
+                  : "";
+  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-500 words unless the user supplied a different length." : "";
+  return `${depth}${constraint}${shape}${limit}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 
 function output(event, fields) {
@@ -428,7 +487,7 @@ export async function handleHook(input = {}, options = envOptions(), dependencie
       try {
         contract = dependencies.store?.loadContract?.(input.session_id) ?? contract;
       } catch {}
-      if (dependencies.store && ["single-action", "command-warning", "single-sentence-definition"].includes(contract.shape)) {
+      if (dependencies.store && BUFFERED_SHAPES.has(contract.shape)) {
         const key = `${input.session_id}_${input.message_id}`;
         try {
           dependencies.store.append(key, input.index, input.delta);

@@ -19,6 +19,12 @@ Minimize reader effort while preserving everything needed to act correctly.
 - A singular immediate-action request gets one imperative sentence: no secondary actions, checklist, audit, follow-up question, or scenario branches.
 - A request for one command plus its necessary warning gets only the command and one short warning sentence: no heading, backup advice, dependency checks, or repeated consequence.
 - A one-sentence definition contains the defining property only; omit benefits, examples, implications, and trailing commentary.
+- A routine factual question gets only the answer and necessary unit; omit arithmetic and justification unless requested.
+- A status update is one compact paragraph containing impact, cause, state, and supplied times; omit headings and audience-specific scripts.
+- A no-op change gets one short confirmation without restating inspected content.
+- An implementation completion gets one short result sentence plus only necessary warnings or unresolved risks.
+- A detailed explanation defaults to 300-500 words unless the user requests another length.
+- A destructive command includes concrete target verification, an option terminator, the narrow command, and one irreversibility warning.
 
 ## Representation
 

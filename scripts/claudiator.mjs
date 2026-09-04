@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   createFileStore,
+  deriveContract,
   envOptions,
   handleHook,
 } from "../src/claudiator.mjs";
@@ -16,7 +17,7 @@ function readStdin() {
   });
 }
 
-function record(dataDir, event, input, result, durationMs) {
+function record(dataDir, event, input, result, durationMs, contract) {
   if (!dataDir) return;
   try {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -32,13 +33,17 @@ function record(dataDir, event, input, result, durationMs) {
       inputChars: typeof input.delta === "string" ? input.delta.length : undefined,
       displayChars: typeof displayed === "string" ? displayed.length : undefined,
       durationMs,
+      shape: contract.shape,
+      depth: contract.depth,
+      representation: contract.representation,
+      wordLimit: contract.wordLimit,
     })}\n`);
   } catch {
     return;
   }
 }
 
-function captureBenchmark(file, input, result) {
+function captureBenchmark(file, input, result, contract) {
   if (!file || input.hook_event_name !== "MessageDisplay") return;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.appendFileSync(file, `${JSON.stringify({
@@ -47,6 +52,7 @@ function captureBenchmark(file, input, result) {
     final: input.final,
     raw: input.delta,
     displayed: result?.hookSpecificOutput?.displayContent,
+    contract,
   })}\n`);
 }
 
@@ -59,8 +65,11 @@ try {
     store,
     readFile: (file) => fs.readFileSync(file, "utf8"),
   });
-  record(dataDir, input.hook_event_name, input, result, Math.round(performance.now() - started));
-  captureBenchmark(process.env.CLAUDIATOR_BENCHMARK_CAPTURE_FILE, input, result);
+  const contract = input.hook_event_name === "UserPromptSubmit"
+    ? deriveContract(input.prompt)
+    : store?.loadContract?.(input.session_id) ?? deriveContract("");
+  record(dataDir, input.hook_event_name, input, result, Math.round(performance.now() - started), contract);
+  captureBenchmark(process.env.CLAUDIATOR_BENCHMARK_CAPTURE_FILE, input, result, contract);
   process.stdout.write(JSON.stringify(result));
 } catch (error) {
   process.stderr.write(`Claudiator hook failed: ${error instanceof Error ? error.message : String(error)}\n`);
