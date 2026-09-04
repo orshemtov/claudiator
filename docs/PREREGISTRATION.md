@@ -4,7 +4,7 @@ Status: **independent micro holdout failed and retired**. Marketplace publicatio
 
 ## Fresh independent holdout
 
-Status: **frozen, not yet run**.
+Status: **failed and retired**.
 
 The replacement suite was authored by a new context-isolated agent forbidden from inspecting Claudiator, its repository, experiments, prior cases, or results. A second context-isolated reviewer corrected only evaluator methodology before freeze. The reviewed suite contains six natural prompts and has fingerprint:
 
@@ -27,6 +27,8 @@ The gate passes only if:
 - The unchanged suite, all failures, costs, and limitations are published.
 
 Passing funds small repository-level greenfield, brownfield, bug-fix, and Ponytail comparisons. It does not itself authorize marketplace publication.
+
+The holdout ran once on 2026-09-04. Claudiator scored 11/18 versus Default at 2/18 and Concise at 3/18, with zero critical shell-safety losses and 56.3% median reducible-word reduction versus Default. It failed the required 18/18 gate and achieved only 14.8% reduction versus Concise. Manual audit also found substantive inaccuracies in the requested SQLite explanation that the static anchors missed. See [results/FRESH-INDEPENDENT-HOLDOUT-2026-09-04.md](results/FRESH-INDEPENDENT-HOLDOUT-2026-09-04.md). The suite is retired and will not be tuned or rerun as a holdout.
 
 ## Independent micro holdout
 

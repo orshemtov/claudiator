@@ -99,4 +99,5 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Revised development gate | Claudiator 18/18; Default 9/18; Concise 10/18 |
 | Independent holdout | Failed 4/18; retired and reported transparently |
 | Natural-request development gate | Claudiator 18/18 after targeted fixes; controls previously scored 3/18 each |
+| Fresh independent holdout | Failed 11/18; retired and reported transparently |
 | Marketplace publication | Blocked |
