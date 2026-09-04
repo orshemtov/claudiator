@@ -24,6 +24,10 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("Give only the single command").strict, true);
   assert.equal(deriveContract("State the immediate action compactly").strict, true);
   assert.equal(deriveContract("State the immediate action compactly").wordLimit, 12);
+  assert.equal(deriveContract("State only the immediate security action").shape, "single-action");
+  assert.equal(deriveContract("State only the immediate security action").wordLimit, 12);
+  assert.equal(deriveContract("Give the command and the necessary warning. Add nothing else.").shape, "command-warning");
+  assert.equal(deriveContract("Give the command and the necessary warning. Add nothing else.").wordLimit, 16);
 });
 
 test("classifyComments protects tooling and rejects narration", () => {
@@ -53,6 +57,10 @@ test("file-backed message store preserves numeric chunk order", async () => {
   store.append("session_message", 2, "two");
   store.append("session_message", 1, "one");
   assert.equal(store.consume("session_message"), "onetwoten");
+  store.saveContract("session", { shape: "single-action", wordLimit: 12 });
+  assert.deepEqual(store.loadContract("session"), { shape: "single-action", wordLimit: 12 });
+  store.cleanupSession("session");
+  assert.equal(store.loadContract("session"), undefined);
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
@@ -169,6 +177,28 @@ test("local display preserves streaming boundaries and may hide filler-only batc
   const final = await handleHook({ hook_event_name: "MessageDisplay", delta: "Done.\n", final: true });
   assert.equal(first.hookSpecificOutput.displayContent, "Result:\n");
   assert.equal(final.hookSpecificOutput.displayContent, "Done.\n");
+});
+
+test("strict local display buffers and selects only the contracted units", async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "claudiator-strict-"));
+  const { createFileStore } = await import("../src/claudiator.mjs");
+  const store = createFileStore(dataDir);
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "action", prompt: "State only the immediate security action" }, {}, { store });
+  const hidden = await handleHook({ hook_event_name: "MessageDisplay", session_id: "action", message_id: "m", index: 0, final: false, delta: "Revoke the key now; " }, {}, { store });
+  const action = await handleHook({ hook_event_name: "MessageDisplay", session_id: "action", message_id: "m", index: 1, final: true, delta: "then audit every log and ask for more context." }, {}, { store });
+  assert.equal(hidden.hookSpecificOutput.displayContent, "");
+  assert.equal(action.hookSpecificOutput.displayContent, "Revoke the key now.");
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "unclear", prompt: "State only the immediate security action" }, {}, { store });
+  const unclearText = "This is serious. Revoke the key now.";
+  const unclear = await handleHook({ hook_event_name: "MessageDisplay", session_id: "unclear", message_id: "m", index: 0, final: true, delta: unclearText }, {}, { store });
+  assert.equal(unclear.hookSpecificOutput.displayContent, unclearText);
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "warning", prompt: "Give the command and the necessary warning. Add nothing else." }, {}, { store });
+  const warning = await handleHook({ hook_event_name: "MessageDisplay", session_id: "warning", message_id: "m", index: 0, final: true, delta: "```sh\nrm -rf ./cache\n```\n\nThis irreversibly deletes the cache. Back it up first." }, {}, { store });
+  assert.equal(warning.hookSpecificOutput.displayContent, "rm -rf ./cache\nThis irreversibly deletes the cache.");
+  fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
 test("handleHook emits Claude Code context and gate schemas", async () => {

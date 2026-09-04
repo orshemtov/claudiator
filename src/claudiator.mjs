@@ -17,17 +17,24 @@ const TRACKING_RE = /\b(?:TODO|FIXME|HACK|XXX)\b/i;
 const HISTORY_RE = /\b(?:used to|previously|historically|originally|changed from|we (?:chose|decided)|old implementation|implementation history)\b/i;
 const NARRATIVE_RE = /^(?:this (?:function|method|class|code|block)|the following code|increment|decrement|set |get |return |loop |iterate |create |initialize |check |call |now we |here we )/i;
 const COMMENTED_CODE_RE = /^(?:const|let|var|if|for|while|return|function|class|def|import|export|[\w.]+\s*=|[\w.]+\([^)]*\);?$)/;
+const ACTION_START_RE = /^(?:immediately\s+)?(?:revoke|rotate|remove|delete|disable|stop|replace|change|restart|retry|run|contact|report|isolate|disconnect|restore|reset|cancel|close|open|use|enable|block|deny|lock|patch|upgrade|fix)\b/i;
+const DESTRUCTIVE_WARNING_RE = /\b(?:warning|delete|remove|destructive|irreversib\w*|permanent\w*|untracked|cannot be undone)\b/i;
 
 export function deriveContract(prompt = "") {
   const depth = DETAIL_RE.test(prompt) ? "detailed" : "minimum";
   const strict = STRICT_FORMAT_RE.test(prompt);
-  const wordLimit = COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined;
+  const shape = strict && /\bimmediate\b.{0,40}\baction\b/i.test(prompt)
+    ? "single-action"
+    : strict && /\bcommand\b/i.test(prompt) && /\bwarning\b/i.test(prompt)
+      ? "command-warning"
+      : "default";
+  const wordLimit = shape === "single-action" ? 12 : shape === "command-warning" ? 16 : COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined;
   let representation = "sentence";
   if (/\bmermaid\b/i.test(prompt)) representation = "mermaid";
   else if (TABLE_RE.test(prompt)) representation = "table";
   else if (DIAGRAM_RE.test(prompt)) representation = "ascii";
   else if (LIST_RE.test(prompt)) representation = "bullets";
-  return { depth, representation, strict, wordLimit };
+  return { depth, representation, strict, wordLimit, shape };
 }
 
 function commentText(line) {
@@ -229,6 +236,38 @@ export function compress(text = "", _contract = {}) {
   };
 }
 
+function firstProseSentence(text) {
+  const prose = String(text)
+    .replace(/```[\s\S]*?```/g, " ")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/^#{1,6}\s/.test(line) && !/^\*{0,2}(?:immediate )?actions?:\*{0,2}\s*$/i.test(line))
+    .map((line) => line.replace(/^(?:[-*+] |\d+\.\s+)/, "").replace(/^\*{1,2}|\*{1,2}$/g, ""))
+    .join(" ");
+  const sentence = prose.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? prose;
+  const clause = sentence.split(/;\s+/)[0].trim();
+  return clause && !/[.!?]$/.test(clause) ? `${clause}.` : clause;
+}
+
+function strictCompress(text, contract) {
+  if (contract.shape === "single-action") {
+    const candidate = firstProseSentence(text);
+    return candidate && ACTION_START_RE.test(candidate)
+      ? { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false }
+      : compress(text, contract);
+  }
+  if (contract.shape === "command-warning") {
+    const fence = String(text).match(/```[^\n]*\n([\s\S]*?)```/);
+    const commands = fence?.[1].trim().split(/\r?\n/).filter(Boolean) ?? [];
+    const warning = firstProseSentence(fence ? String(text).replace(fence[0], " ") : text);
+    if (commands.length === 1 && warning && DESTRUCTIVE_WARNING_RE.test(warning)) {
+      const candidate = `${commands[0]}\n${warning}`;
+      return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
+    }
+  }
+  return compress(text, contract);
+}
+
 function contextFor(contract) {
   const depth = contract.depth === "detailed"
     ? "The user explicitly requested depth; provide it, but keep it structured and non-repetitive."
@@ -237,7 +276,12 @@ function contextFor(contract) {
     ? " The requested quantity or format is strict: return exactly that, with no qualification, alternative, or adjacent advice."
     : "";
   const limit = contract.wordLimit ? ` Hard limit: ${contract.wordLimit} words.` : "";
-  return `${depth}${constraint}${limit}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
+  const shape = contract.shape === "single-action"
+    ? " Use one imperative sentence containing only the requested action; no checklist, follow-up, audit, or question."
+    : contract.shape === "command-warning"
+      ? " Use only the command and one short warning sentence; no heading, backup advice, dependency checks, or irreversible-action recap."
+      : "";
+  return `${depth}${constraint}${shape}${limit}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 
 function output(event, fields) {
@@ -254,6 +298,7 @@ function envOptions(env = process.env) {
 
 export function createFileStore(dataDir) {
   const root = path.join(dataDir, "buffers");
+  const contracts = path.join(dataDir, "contracts");
   const safe = (value) => String(value ?? "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
   const dirFor = (key) => path.join(root, safe(key));
   return {
@@ -273,12 +318,22 @@ export function createFileStore(dataDir) {
       fs.rmSync(dir, { recursive: true, force: true });
       return text;
     },
+    saveContract(sessionId, contract) {
+      fs.mkdirSync(contracts, { recursive: true });
+      fs.writeFileSync(path.join(contracts, `${safe(sessionId)}.json`), JSON.stringify(contract));
+    },
+    loadContract(sessionId) {
+      const file = path.join(contracts, `${safe(sessionId)}.json`);
+      return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : undefined;
+    },
     cleanupSession(sessionId) {
-      if (!fs.existsSync(root)) return;
       const prefix = `${safe(sessionId)}_`;
-      for (const name of fs.readdirSync(root)) {
-        if (name.startsWith(prefix)) fs.rmSync(path.join(root, name), { recursive: true, force: true });
+      if (fs.existsSync(root)) {
+        for (const name of fs.readdirSync(root)) {
+          if (name.startsWith(prefix)) fs.rmSync(path.join(root, name), { recursive: true, force: true });
+        }
       }
+      fs.rmSync(path.join(contracts, `${safe(sessionId)}.json`), { force: true });
     },
   };
 }
@@ -317,7 +372,11 @@ export async function anthropicSemanticCompress(text, options, fetchImpl = fetch
 export async function handleHook(input = {}, options = envOptions(), dependencies = {}) {
   const event = input.hook_event_name;
   if (event === "UserPromptSubmit") {
-    return output(event, { additionalContext: contextFor(deriveContract(input.prompt)) });
+    const contract = deriveContract(input.prompt);
+    try {
+      dependencies.store?.saveContract?.(input.session_id, contract);
+    } catch {}
+    return output(event, { additionalContext: contextFor(contract) });
   }
   if (event === "SubagentStart") {
     return output(event, {
@@ -347,7 +406,22 @@ export async function handleHook(input = {}, options = envOptions(), dependencie
   if (event === "MessageDisplay") {
     const semantic = Boolean(options.semanticRenderer && options.apiKey);
     if (!semantic) {
-      const result = compress(input.delta, deriveContract(""));
+      let contract = deriveContract("");
+      try {
+        contract = dependencies.store?.loadContract?.(input.session_id) ?? contract;
+      } catch {}
+      if (dependencies.store && ["single-action", "command-warning"].includes(contract.shape)) {
+        const key = `${input.session_id}_${input.message_id}`;
+        try {
+          dependencies.store.append(key, input.index, input.delta);
+          if (!input.final) return output(event, { displayContent: "" });
+          const original = dependencies.store.consume(key);
+          return output(event, { displayContent: strictCompress(original, contract).text });
+        } catch {
+          return output(event, { displayContent: input.delta });
+        }
+      }
+      const result = compress(input.delta, contract);
       return output(event, { displayContent: result.text });
     }
     const key = `${input.session_id}_${input.message_id}`;

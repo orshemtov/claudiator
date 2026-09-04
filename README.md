@@ -23,7 +23,7 @@ flowchart LR
 - Prompt context selects the smallest useful representation and honors explicit depth.
 - File-write hooks reject obvious comment bloat and a semantic hook judges broader over-engineering.
 - Subagents receive a compact return contract and one repair opportunity.
-- The local display renderer removes only safely recognizable filler.
+- The local display renderer removes safely recognizable filler and enforces explicit single-action or command-plus-warning contracts without paraphrasing.
 - An optional semantic renderer performs stronger display-only compression through the Anthropic API.
 
 ## Requirements
@@ -68,6 +68,12 @@ npm run benchmark:selftest
 claude plugin validate --strict .
 ```
 
+Run the low-cost training gate before opening its locked paraphrased holdout:
+
+```sh
+node benchmark/run.mjs --suite micro-train --arms default,claudiator --model haiku --runs 1 --max-cost-usd 0.25
+```
+
 Run the cheap native eval pilot:
 
 ```sh
@@ -88,6 +94,6 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Generation, artifact, subagent, and display hooks | Implemented |
 | Protected-comment tests | Implemented |
 | Native eval suite | Authored; native runner account-gated |
-| Comparative 24-case corpus | Pilot underway |
-| Frozen thresholds and holdout | Not started |
+| Comparative corpus | 24 broad cases plus 12-case micro train/holdout gate |
+| Frozen thresholds and holdout | Holdout authored and fingerprinted; not opened |
 | Marketplace publication | Blocked |
