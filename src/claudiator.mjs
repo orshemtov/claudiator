@@ -67,7 +67,7 @@ export function deriveContract(prompt = "") {
     "implementation-result": 30,
     "destructive-command": 80,
   };
-  const wordLimit = requestedWordLimit(prompt) ?? (depth === "detailed" ? 400 : limits[shape] ?? (COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined));
+  const wordLimit = requestedWordLimit(prompt) ?? (depth === "detailed" ? 350 : limits[shape] ?? (COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined));
   let representation = "sentence";
   if (/\bmermaid\b/i.test(prompt)) representation = "mermaid";
   else if (TABLE_RE.test(prompt)) representation = "table";
@@ -354,7 +354,7 @@ function contextFor(contract) {
                 : contract.shape === "destructive-command"
                   ? ` Use \`realpath -- TARGET\` to verify the exact target${contract.target ? ` ${contract.target}` : ""}, then \`rm -rf -- TARGET\`; never add sudo. State that deletion is irreversible. Do not replace path resolution with ls or generic advice.`
                   : "";
-  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-400 words unless the user supplied a different length." : "";
+  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-350 words unless the user supplied a different length. Before responding, silently check the length and delete repetition or secondary examples if it exceeds the limit." : "";
   return `${depth}${constraint}${shape}${limit}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 

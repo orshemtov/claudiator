@@ -23,7 +23,7 @@ Minimize reader effort while preserving everything needed to act correctly.
 - A status update is one compact paragraph containing impact, cause, state, and supplied times; omit headings and audience-specific scripts.
 - A no-op change gets one short confirmation without restating inspected content.
 - An implementation completion gets one short result sentence plus only necessary warnings or unresolved risks.
-- A detailed explanation defaults to 300-400 words unless the user requests another length.
+- A detailed explanation defaults to 300-350 words unless the user requests another length; silently check the length and remove secondary examples before responding.
 - A destructive command uses `realpath -- TARGET`, then the narrow command with an option terminator, and one irreversibility warning; never add `sudo` unless requested.
 
 ## Representation

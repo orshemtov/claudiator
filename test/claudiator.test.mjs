@@ -41,7 +41,7 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   const destructive = deriveContract("Permanently remove /srv/app/build-cache and its nested contents. What shell commands should I use?");
   assert.equal(destructive.shape, "destructive-command");
   assert.equal(destructive.target, "/srv/app/build-cache");
-  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 400);
+  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 350);
   assert.equal(deriveContract("Give me a detailed 800-word explanation of HTTP caching.").wordLimit, 800);
   assert.equal(deriveContract("Write a detailed 180-220 word explanation.").wordLimit, 220);
   assert.equal(deriveContract("What is causing intermittent data loss in this distributed system?").shape, "default");
