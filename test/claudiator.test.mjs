@@ -41,7 +41,7 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   const destructive = deriveContract("Permanently remove /srv/app/build-cache and its nested contents. What shell commands should I use?");
   assert.equal(destructive.shape, "destructive-command");
   assert.equal(destructive.target, "/srv/app/build-cache");
-  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 450);
+  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 400);
   assert.equal(deriveContract("Give me a detailed 800-word explanation of HTTP caching.").wordLimit, 800);
   assert.equal(deriveContract("Write a detailed 180-220 word explanation.").wordLimit, 220);
   assert.equal(deriveContract("What is causing intermittent data loss in this distributed system?").shape, "default");
@@ -230,6 +230,10 @@ test("strict local display buffers and selects only the contracted units", async
   await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "noop", prompt: "Please make sure telemetry is disabled in settings.json." }, {}, { store });
   const noop = await handleHook({ hook_event_name: "MessageDisplay", session_id: "noop", message_id: "m", index: 0, final: true, delta: "Telemetry is already disabled in settings.json (`telemetry: false`). No changes needed." }, {}, { store });
   assert.equal(noop.hookSpecificOutput.displayContent, "No changes needed.");
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "status", prompt: "Draft an internal status update for engineering and support." }, {}, { store });
+  const status = await handleHook({ hook_event_name: "MessageDisplay", session_id: "status", message_id: "m", index: 0, final: true, delta: "**Status:** Ongoing\n\n**Impact:** All requests fail\n\n**Next update:** 09:10 UTC" }, {}, { store });
+  assert.equal(status.hookSpecificOutput.displayContent, "**Status:** Ongoing **Impact:** All requests fail **Next update:** 09:10 UTC");
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

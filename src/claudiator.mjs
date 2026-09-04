@@ -67,7 +67,7 @@ export function deriveContract(prompt = "") {
     "implementation-result": 30,
     "destructive-command": 80,
   };
-  const wordLimit = requestedWordLimit(prompt) ?? (depth === "detailed" ? 450 : limits[shape] ?? (COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined));
+  const wordLimit = requestedWordLimit(prompt) ?? (depth === "detailed" ? 400 : limits[shape] ?? (COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined));
   let representation = "sentence";
   if (/\bmermaid\b/i.test(prompt)) representation = "mermaid";
   else if (TABLE_RE.test(prompt)) representation = "table";
@@ -320,6 +320,12 @@ function strictCompress(text, contract) {
     const state = sentence.match(/^(.+?\bis already (?:disabled|enabled|configured|set))(?:\s+in\b.*)?[.!?]?$/i)?.[1];
     if (state) return { text: `${state}.`, changed: true, removedLines: 0, fallback: false };
   }
+  if (contract.shape === "status-update" && !String(text).includes("```")) {
+    const reduced = compress(text, contract);
+    const candidate = reduced.text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && line !== "---").join(" ");
+    const verification = verifyPreservation(text, candidate, extractProtected(text));
+    if (candidate && verification.ok) return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
+  }
   return compress(text, contract);
 }
 
@@ -348,7 +354,7 @@ function contextFor(contract) {
                 : contract.shape === "destructive-command"
                   ? ` Use \`realpath -- TARGET\` to verify the exact target${contract.target ? ` ${contract.target}` : ""}, then \`rm -rf -- TARGET\`; never add sudo. State that deletion is irreversible. Do not replace path resolution with ls or generic advice.`
                   : "";
-  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-450 words unless the user supplied a different length." : "";
+  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-400 words unless the user supplied a different length." : "";
   return `${depth}${constraint}${shape}${limit}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 
