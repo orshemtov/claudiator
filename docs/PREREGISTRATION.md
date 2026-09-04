@@ -1,6 +1,6 @@
 # Evaluation preregistration
 
-Status: **independent micro holdout frozen and unopened**. Marketplace publication is blocked.
+Status: **independent micro holdout failed and retired**. Marketplace publication is blocked.
 
 ## Independent micro holdout
 
@@ -26,6 +26,8 @@ This first-stage holdout passes only if:
 - All results, failures, costs, and limitations are reported without changing cases, graders, or thresholds.
 
 Passing this small deterministic gate supports funding broader application and brownfield evaluations. It does not by itself satisfy the marketplace gate or prove general superiority.
+
+The holdout ran once on 2026-09-04 and failed. Claudiator passed 4/18 cells, reduced median words by 22.8% versus Default and 0% versus Concise on reducible pairs, omitted the required concrete destructive-target verification, and exceeded the requested-depth maximum in every run. See [results/INDEPENDENT-HOLDOUT-2026-09-04.md](results/INDEPENDENT-HOLDOUT-2026-09-04.md). The suite is retired and will not be tuned or rerun as a holdout.
 
 ## Retired first holdout
 

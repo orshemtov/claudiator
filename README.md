@@ -80,7 +80,7 @@ Run the cheap native eval pilot:
 claude plugin eval . --case 01-direct-command --runs 1 --ablation with-without --no-scaffold --no-publish --model haiku --max-cost-usd 0.50
 ```
 
-See [docs/BENCHMARK.md](docs/BENCHMARK.md) for the controlled comparison, [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) for the marketplace gate, and the [first locked holdout report](docs/results/MICRO-HOLDOUT-2026-09-04.md) for current evidence.
+See [docs/BENCHMARK.md](docs/BENCHMARK.md) for the controlled comparison, [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) for the marketplace gate, and the [independent holdout report](docs/results/INDEPENDENT-HOLDOUT-2026-09-04.md) for current evidence.
 
 ## Privacy
 
@@ -97,5 +97,5 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Comparative corpus | 24 broad cases plus 24 micro development/holdout cases |
 | Micro holdout | Failed 13/18; retired and reported transparently |
 | Revised development gate | Claudiator 18/18; Default 9/18; Concise 10/18 |
-| Independent holdout | Frozen and unopened; six cases, 54-call maximum |
+| Independent holdout | Failed 4/18; retired and reported transparently |
 | Marketplace publication | Blocked |
