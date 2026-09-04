@@ -95,5 +95,5 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Protected-comment tests | Implemented |
 | Native eval suite | Authored; native runner account-gated |
 | Comparative corpus | 24 broad cases plus 12-case micro train/holdout gate |
-| Frozen thresholds and holdout | Holdout authored and fingerprinted; not opened |
+| Frozen thresholds and holdout | Micro thresholds frozen; holdout fingerprinted and unopened |
 | Marketplace publication | Blocked |

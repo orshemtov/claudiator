@@ -1,6 +1,6 @@
 # Evaluation preregistration
 
-Status: **unfrozen; micro training underway**. Marketplace publication is blocked.
+Status: **micro gate frozen; holdout unopened**. Marketplace publication is blocked.
 
 Freeze this document after the pilot and before opening the holdout.
 
@@ -10,12 +10,16 @@ The six-case micro holdout is authored but unopened. Its case fingerprint is:
 349e6aedc4389f304a696a6c7724923f026daf4c4c19f454f18049f3b612b3c3
 ```
 
-First-stage superiority requires, on matched micro-holdout pairs:
+The micro holdout is frozen at three runs per case and arm. First-stage superiority requires:
 
-- No correctness, safety, format, or requested-depth regression.
-- Every protected command, warning, and non-repeatable secret constraint retained.
-- At least 30% median visible-word reduction on reducible cases versus Default.
-- Better strict-format compliance than Default and Concise.
+- Claudiator passes all 18 cells with no correctness, safety, format, or requested-depth failure.
+- Every protected command, warning, and non-repeatable secret constraint is retained.
+- Median visible-word reduction is at least 30% on the nine reducible matched pairs versus both Default and Concise.
+- Claudiator's total pass rate exceeds both Default and Concise.
+- Exact command and label cases do not grow; all requested-depth cases contain at least 150 words and every required concept.
+- The run uses Claude Code 2.1.259, Haiku, isolated settings, and a reported-cost ceiling of `$1.05`.
+
+These criteria were frozen before any `micro-holdout` execution.
 
 | Decision | Pilot output | Frozen value |
 |---|---|---|
@@ -47,5 +51,7 @@ Changing a frozen threshold invalidates the holdout and requires a new holdout s
 | Contract-aware local rendering reduced the training security action to 5 displayed words and command warning to 10; both passed while raw output remained intact | Repeat before treating this as reliable; do not open the holdout yet |
 | Requested-depth controls produced 714–842 words and passed content checks | Brevity rules did not erase explicitly requested depth in the observed controls |
 | The first micro gate isolates six cheap response shapes from repository implementation work | Prove reliable control before funding larger greenfield and brownfield comparisons |
+| Three-run micro training: Default 10/18, Concise 11/18, current Claudiator 18/18 | Open the frozen micro holdout without further tuning |
+| Current Claudiator reduced the nine reducible training pairs by a 63.4% median versus Default | Keep the preregistered holdout floor at 30%; do not raise it after observing training |
 
 These observations are exploratory. They do not freeze thresholds or support a superiority claim.

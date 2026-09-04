@@ -28,6 +28,8 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("State only the immediate security action").wordLimit, 12);
   assert.equal(deriveContract("Give the command and the necessary warning. Add nothing else.").shape, "command-warning");
   assert.equal(deriveContract("Give the command and the necessary warning. Add nothing else.").wordLimit, 16);
+  assert.equal(deriveContract("Define idempotency in one sentence.").shape, "single-sentence-definition");
+  assert.equal(deriveContract("Explain thoroughly and define the term in one sentence.").shape, "default");
 });
 
 test("classifyComments protects tooling and rejects narration", () => {
@@ -194,6 +196,10 @@ test("strict local display buffers and selects only the contracted units", async
   const unclearText = "This is serious. Revoke the key now.";
   const unclear = await handleHook({ hook_event_name: "MessageDisplay", session_id: "unclear", message_id: "m", index: 0, final: true, delta: unclearText }, {}, { store });
   assert.equal(unclear.hookSpecificOutput.displayContent, unclearText);
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "definition", prompt: "Define idempotency in one sentence." }, {}, { store });
+  const definition = await handleHook({ hook_event_name: "MessageDisplay", session_id: "definition", message_id: "m", index: 0, final: true, delta: "Idempotency means repeated identical requests have the same effect as one request, making retries safe without duplicate side effects." }, {}, { store });
+  assert.equal(definition.hookSpecificOutput.displayContent, "Idempotency means repeated identical requests have the same effect as one request.");
 
   await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "warning", prompt: "Give the command and the necessary warning. Add nothing else." }, {}, { store });
   const warning = await handleHook({ hook_event_name: "MessageDisplay", session_id: "warning", message_id: "m", index: 0, final: true, delta: "```sh\nrm -rf ./cache\n```\n\nThis irreversibly deletes the cache. Back it up first." }, {}, { store });

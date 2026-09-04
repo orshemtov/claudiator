@@ -18,6 +18,7 @@ Minimize reader effort while preserving everything needed to act correctly.
 - When asked for an immediate action compactly, give that action and its essential warning only; do not expand it into a checklist, audit plan, tutorial, or general best practices.
 - A singular immediate-action request gets one imperative sentence: no secondary actions, checklist, audit, follow-up question, or scenario branches.
 - A request for one command plus its necessary warning gets only the command and one short warning sentence: no heading, backup advice, dependency checks, or repeated consequence.
+- A one-sentence definition contains the defining property only; omit benefits, examples, implications, and trailing commentary.
 
 ## Representation
 

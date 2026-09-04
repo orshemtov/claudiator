@@ -23,12 +23,14 @@ const DESTRUCTIVE_WARNING_RE = /\b(?:warning|delete|remove|destructive|irreversi
 export function deriveContract(prompt = "") {
   const depth = DETAIL_RE.test(prompt) ? "detailed" : "minimum";
   const strict = STRICT_FORMAT_RE.test(prompt);
-  const shape = strict && /\bimmediate\b.{0,40}\baction\b/i.test(prompt)
+  const shape = depth === "minimum" && strict && /\bimmediate\b.{0,40}\baction\b/i.test(prompt)
     ? "single-action"
-    : strict && /\bcommand\b/i.test(prompt) && /\bwarning\b/i.test(prompt)
+    : depth === "minimum" && strict && /\bcommand\b/i.test(prompt) && /\bwarning\b/i.test(prompt)
       ? "command-warning"
+      : depth === "minimum" && /\bdefine\b/i.test(prompt) && /\bone sentence\b/i.test(prompt)
+        ? "single-sentence-definition"
       : "default";
-  const wordLimit = shape === "single-action" ? 12 : shape === "command-warning" ? 16 : COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined;
+  const wordLimit = shape === "single-action" ? 12 : shape === "command-warning" ? 16 : shape === "single-sentence-definition" ? 20 : COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined;
   let representation = "sentence";
   if (/\bmermaid\b/i.test(prompt)) representation = "mermaid";
   else if (TABLE_RE.test(prompt)) representation = "table";
@@ -265,6 +267,11 @@ function strictCompress(text, contract) {
       return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
     }
   }
+  if (contract.shape === "single-sentence-definition") {
+    const sentence = firstProseSentence(text);
+    const candidate = sentence.replace(/,\s+(?:making|ensuring|allowing|so|which|meaning)\b.*[.!?]$/i, ".");
+    return candidate ? { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false } : compress(text, contract);
+  }
   return compress(text, contract);
 }
 
@@ -280,6 +287,8 @@ function contextFor(contract) {
     ? " Use one imperative sentence containing only the requested action; no checklist, follow-up, audit, or question."
     : contract.shape === "command-warning"
       ? " Use only the command and one short warning sentence; no heading, backup advice, dependency checks, or irreversible-action recap."
+      : contract.shape === "single-sentence-definition"
+        ? " Use one short defining sentence; omit benefits, examples, implications, and trailing commentary."
       : "";
   return `${depth}${constraint}${shape}${limit}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
@@ -410,7 +419,7 @@ export async function handleHook(input = {}, options = envOptions(), dependencie
       try {
         contract = dependencies.store?.loadContract?.(input.session_id) ?? contract;
       } catch {}
-      if (dependencies.store && ["single-action", "command-warning"].includes(contract.shape)) {
+      if (dependencies.store && ["single-action", "command-warning", "single-sentence-definition"].includes(contract.shape)) {
         const key = `${input.session_id}_${input.message_id}`;
         try {
           dependencies.store.append(key, input.index, input.delta);
