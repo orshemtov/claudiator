@@ -28,6 +28,7 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("State only the immediate security action").wordLimit, 12);
   assert.equal(deriveContract("Give the command and the necessary warning. Add nothing else.").shape, "command-warning");
   assert.equal(deriveContract("Give the command and the necessary warning. Add nothing else.").wordLimit, 16);
+  assert.equal(deriveContract("Provide `docker system prune -a` with only its necessary warning.").shape, "command-warning");
   assert.equal(deriveContract("Define idempotency in one sentence.").shape, "single-sentence-definition");
   assert.equal(deriveContract("Explain thoroughly and define the term in one sentence.").shape, "default");
 });

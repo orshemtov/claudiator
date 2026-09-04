@@ -90,3 +90,7 @@ node benchmark/run.mjs --resume benchmark/runs/RUN_DIRECTORY --suite micro-train
 After the micro holdout passes, advance to small deterministic greenfield, brownfield, bug-fix, investigation, and no-op repository tasks. Full FastAPI or Express builds are demonstration-scale confirmation, not the first proof.
 
 The first locked micro holdout did not pass and is retired. Its unchanged formal result is published in [results/MICRO-HOLDOUT-2026-09-04.md](results/MICRO-HOLDOUT-2026-09-04.md).
+
+Subsequent evaluation uses separate content-correctness and presentation-compliance scores. Visible-word counts exclude Markdown fence markers, and equivalent answers are accepted only when declared before execution. These changes do not alter the retired holdout's formal score.
+
+The revised six-case development suite passed 18/18 for Claudiator versus 9/18 for Default and 10/18 for Concise. See [results/MICRO-NEXT-TRAIN-2026-09-04.md](results/MICRO-NEXT-TRAIN-2026-09-04.md). A fresh independently authored holdout is still required.

@@ -94,8 +94,14 @@ function repositoryDiff(workspace) {
 
 function outputMetrics(text) {
   const trimmed = String(text ?? "").trim();
+  const visible = trimmed
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*```[^`]*$/.test(line))
+    .map((line) => line.replace(/^\s*(?:#{1,6}|[-*+]|\d+\.)\s+/, ""))
+    .join("\n")
+    .trim();
   return {
-    words: trimmed ? trimmed.split(/\s+/).length : 0,
+    words: visible ? visible.split(/\s+/).length : 0,
     lines: trimmed ? trimmed.split(/\r?\n/).length : 0,
     paragraphs: trimmed ? trimmed.split(/\n\s*\n/).length : 0,
     headings: (trimmed.match(/^#{1,6}\s/gm) ?? []).length,
@@ -108,28 +114,35 @@ function testPatterns(text, patterns = []) {
 
 function scoreCase(testCase, workspace, response) {
   const checks = [];
+  const add = (check, pass, dimension) => checks.push({ check, pass, dimension });
   const output = outputMetrics(response);
-  for (const result of testPatterns(response, testCase.requiredOutput)) checks.push({ check: `output ${result.pattern}`, pass: result.pass });
-  for (const result of testPatterns(response, testCase.forbiddenOutput)) checks.push({ check: `output excludes ${result.pattern}`, pass: !result.pass });
-  if (testCase.exactOutput !== undefined) checks.push({ check: `output is exactly ${JSON.stringify(testCase.exactOutput)}`, pass: String(response).trim() === testCase.exactOutput });
-  if (testCase.maxWords !== undefined) checks.push({ check: `output has at most ${testCase.maxWords} words`, pass: output.words <= testCase.maxWords });
-  if (testCase.minWords !== undefined) checks.push({ check: `output has at least ${testCase.minWords} words`, pass: output.words >= testCase.minWords });
-  if (testCase.maxLines !== undefined) checks.push({ check: `output has at most ${testCase.maxLines} lines`, pass: output.lines <= testCase.maxLines });
+  for (const result of testPatterns(response, testCase.requiredOutput)) add(`output ${result.pattern}`, result.pass, "content");
+  for (const alternatives of testCase.requiredAnyOutput ?? []) {
+    const results = testPatterns(response, alternatives);
+    add(`output matches any of ${results.map(({ pattern }) => pattern).join(", ")}`, results.some(({ pass }) => pass), "content");
+  }
+  for (const result of testPatterns(response, testCase.forbiddenOutput)) add(`output excludes ${result.pattern}`, !result.pass, "presentation");
+  if (testCase.exactOutput !== undefined) add(`output is exactly ${JSON.stringify(testCase.exactOutput)}`, String(response).trim() === testCase.exactOutput, "presentation");
+  if (testCase.maxWords !== undefined) add(`output has at most ${testCase.maxWords} words`, output.words <= testCase.maxWords, "presentation");
+  if (testCase.minWords !== undefined) add(`output has at least ${testCase.minWords} words`, output.words >= testCase.minWords, "content");
+  if (testCase.maxLines !== undefined) add(`output has at most ${testCase.maxLines} lines`, output.lines <= testCase.maxLines, "presentation");
   for (const expected of testCase.files ?? []) {
     const target = path.join(workspace, expected.path);
     const exists = fs.existsSync(target);
-    checks.push({ check: `${expected.path} exists`, pass: exists });
+    add(`${expected.path} exists`, exists, "content");
     const content = exists ? fs.readFileSync(target, "utf8") : "";
     const nonEmptyLines = content.split(/\r?\n/).filter((line) => line.trim()).length;
     const comments = classifyComments(content, path.extname(expected.path).slice(1));
-    for (const result of testPatterns(content, expected.patterns)) checks.push({ check: `${expected.path} ${result.pattern}`, pass: result.pass });
-    for (const result of testPatterns(content, expected.forbidden)) checks.push({ check: `${expected.path} excludes ${result.pattern}`, pass: !result.pass });
-    if (expected.maxLines !== undefined) checks.push({ check: `${expected.path} has at most ${expected.maxLines} non-empty lines`, pass: nonEmptyLines <= expected.maxLines });
-    if (expected.maxComments !== undefined) checks.push({ check: `${expected.path} has at most ${expected.maxComments} comments`, pass: comments.length <= expected.maxComments });
+    for (const result of testPatterns(content, expected.patterns)) add(`${expected.path} ${result.pattern}`, result.pass, "content");
+    for (const result of testPatterns(content, expected.forbidden)) add(`${expected.path} excludes ${result.pattern}`, !result.pass, "presentation");
+    if (expected.maxLines !== undefined) add(`${expected.path} has at most ${expected.maxLines} non-empty lines`, nonEmptyLines <= expected.maxLines, "presentation");
+    if (expected.maxComments !== undefined) add(`${expected.path} has at most ${expected.maxComments} comments`, comments.length <= expected.maxComments, "presentation");
   }
-  if (testCase.maxChangedFiles !== undefined) checks.push({ check: `repository changes at most ${testCase.maxChangedFiles} files`, pass: changedFiles(workspace).length <= testCase.maxChangedFiles });
-  if (testCase.noChanges) checks.push({ check: "repository unchanged", pass: changedFiles(workspace).length === 0 });
-  return { pass: checks.every(({ pass }) => pass), checks };
+  if (testCase.maxChangedFiles !== undefined) add(`repository changes at most ${testCase.maxChangedFiles} files`, changedFiles(workspace).length <= testCase.maxChangedFiles, "presentation");
+  if (testCase.noChanges) add("repository unchanged", changedFiles(workspace).length === 0, "content");
+  const contentPass = checks.filter(({ dimension }) => dimension === "content").every(({ pass }) => pass);
+  const presentationPass = checks.filter(({ dimension }) => dimension === "presentation").every(({ pass }) => pass);
+  return { pass: contentPass && presentationPass, contentPass, presentationPass, checks };
 }
 
 function resolvePonytail() {
@@ -237,6 +250,8 @@ function runCell(testCase, arm, runNumber, model, destination) {
     run: runNumber,
     ...score,
     ...outputMetrics(messages.displayedResponse),
+    rawWords: outputMetrics(messages.rawResponse).words,
+    rawLines: outputMetrics(messages.rawResponse).lines,
     ...diffStats(workspace),
     costUsd: parsed.costUsd,
     durationMs: parsed.durationMs,
@@ -301,7 +316,10 @@ function summarize(rows, keyFor) {
   return Object.fromEntries([...groups].map(([key, cells]) => [key, {
     cells: cells.length,
     passRate: cells.filter(({ pass }) => pass).length / cells.length,
+    contentPassRate: cells.filter(({ contentPass }) => contentPass).length / cells.length,
+    presentationPassRate: cells.filter(({ presentationPass }) => presentationPass).length / cells.length,
     medianWords: median(cells.map(({ words = 0 }) => words)),
+    medianRawWords: median(cells.map(({ rawWords, words = 0 }) => rawWords ?? words)),
     medianSourceLines: median(cells.map(({ sourceLines = 0 }) => sourceLines)),
     medianComments: median(cells.map(({ commentLines = 0 }) => commentLines)),
     totalCostUsd: cells.reduce((sum, { costUsd = 0 }) => sum + costUsd, 0),
@@ -313,21 +331,22 @@ function aggregate(rows) {
   return {
     byArm: summarize(rows, ({ arm }) => arm),
     byCategory: summarize(rows, ({ arm, category }) => `${category}::${arm}`),
-    pairedVsDefault: pairedComparisons(rows),
+    pairedVsDefault: pairedComparisons(rows, "default"),
+    pairedVsConcise: pairedComparisons(rows, "concise"),
   };
 }
 
-function pairedComparisons(rows) {
+function pairedComparisons(rows, baselineArm) {
   const usable = rows.filter(({ error }) => !error);
-  const defaults = new Map(usable.filter(({ arm }) => arm === "default").map((row) => [`${row.case}:${row.run}`, row]));
-  const arms = [...new Set(usable.map(({ arm }) => arm))].filter((arm) => arm !== "default");
+  const baselines = new Map(usable.filter(({ arm }) => arm === baselineArm).map((row) => [`${row.case}:${row.run}`, row]));
+  const arms = [...new Set(usable.map(({ arm }) => arm))].filter((arm) => arm !== baselineArm);
   return Object.fromEntries(arms.map((arm) => {
-    const pairs = usable.filter((row) => row.arm === arm && defaults.has(`${row.case}:${row.run}`)).map((row) => [defaults.get(`${row.case}:${row.run}`), row]);
+    const pairs = usable.filter((row) => row.arm === arm && baselines.has(`${row.case}:${row.run}`)).map((row) => [baselines.get(`${row.case}:${row.run}`), row]);
     const reducible = pairs.filter(([, treatment]) => treatment.reducible);
     return [arm, {
       pairs: pairs.length,
       reduciblePairs: reducible.length,
-      defaultPassRate: pairs.length ? pairs.filter(([baseline]) => baseline.pass).length / pairs.length : 0,
+      baselinePassRate: pairs.length ? pairs.filter(([baseline]) => baseline.pass).length / pairs.length : 0,
       armPassRate: pairs.length ? pairs.filter(([, treatment]) => treatment.pass).length / pairs.length : 0,
       medianWordDelta: median(pairs.map(([baseline, treatment]) => treatment.words - baseline.words)),
       medianWordReductionPct: median(pairs.filter(([baseline]) => baseline.words > 0).map(([baseline, treatment]) => 100 * (baseline.words - treatment.words) / baseline.words)),
@@ -345,12 +364,12 @@ function writeReport(destination, metadata, rows) {
   fs.writeFileSync(path.join(destination, "aggregate.json"), JSON.stringify({ metadata, summary, rows }, null, 2));
   const rowsFor = (entries, splitCategory = false) => Object.entries(entries).map(([key, value]) => {
     const [category, arm] = splitCategory ? key.split("::") : ["all", key];
-    return `<tr><td>${escapeHtml(category)}</td><td>${escapeHtml(arm)}</td><td>${(value.passRate * 100).toFixed(1)}%</td><td>${value.medianWords}</td><td>${value.medianSourceLines}</td><td>${value.medianComments}</td><td>$${value.totalCostUsd.toFixed(4)}</td><td>${value.medianDurationMs}</td></tr>`;
+    return `<tr><td>${escapeHtml(category)}</td><td>${escapeHtml(arm)}</td><td>${(value.passRate * 100).toFixed(1)}%</td><td>${(value.contentPassRate * 100).toFixed(1)}%</td><td>${(value.presentationPassRate * 100).toFixed(1)}%</td><td>${value.medianWords}</td><td>${value.medianRawWords}</td><td>${value.medianSourceLines}</td><td>${value.medianComments}</td><td>$${value.totalCostUsd.toFixed(4)}</td><td>${value.medianDurationMs}</td></tr>`;
   }).join("");
-  const header = "<thead><tr><th>Category</th><th>Arm</th><th>Pass</th><th>Median words</th><th>Median source LOC</th><th>Median comments</th><th>Cost</th><th>Median ms</th></tr></thead>";
-  const pairedRows = Object.entries(summary.pairedVsDefault).map(([arm, value]) => `<tr><td>${escapeHtml(arm)}</td><td>${value.pairs}</td><td>${(value.defaultPassRate * 100).toFixed(1)}%</td><td>${(value.armPassRate * 100).toFixed(1)}%</td><td>${value.medianWordDelta}</td><td>${value.medianWordReductionPct.toFixed(1)}%</td><td>${value.reduciblePairs}</td><td>${value.medianReducibleWordReductionPct.toFixed(1)}%</td></tr>`).join("");
-  const pairedHeader = "<thead><tr><th>Arm</th><th>Matched pairs</th><th>Default pass</th><th>Arm pass</th><th>Median word delta</th><th>Median reduction</th><th>Reducible pairs</th><th>Reducible reduction</th></tr></thead>";
-  fs.writeFileSync(path.join(destination, "report.html"), `<!doctype html><meta charset="utf-8"><title>Claudiator benchmark</title><style>body{font:16px system-ui;max-width:1100px;margin:40px auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px;text-align:left}</style><h1>Claudiator benchmark</h1><pre>${escapeHtml(JSON.stringify(metadata, null, 2))}</pre><p>Only matched pairs support cross-arm comparisons. Category and all-cell totals are descriptive.</p><h2>Paired with Default</h2><table>${pairedHeader}<tbody>${pairedRows}</tbody></table><h2>By category</h2><table>${header}<tbody>${rowsFor(summary.byCategory, true)}</tbody></table><h2>All executed cells</h2><table>${header}<tbody>${rowsFor(summary.byArm)}</tbody></table>`);
+  const header = "<thead><tr><th>Category</th><th>Arm</th><th>Pass</th><th>Content</th><th>Presentation</th><th>Median words</th><th>Median raw words</th><th>Median source LOC</th><th>Median comments</th><th>Cost</th><th>Median ms</th></tr></thead>";
+  const pairedHeader = "<thead><tr><th>Arm</th><th>Matched pairs</th><th>Baseline pass</th><th>Arm pass</th><th>Median word delta</th><th>Median reduction</th><th>Reducible pairs</th><th>Reducible reduction</th></tr></thead>";
+  const pairedRows = (entries) => Object.entries(entries).map(([arm, value]) => `<tr><td>${escapeHtml(arm)}</td><td>${value.pairs}</td><td>${(value.baselinePassRate * 100).toFixed(1)}%</td><td>${(value.armPassRate * 100).toFixed(1)}%</td><td>${value.medianWordDelta}</td><td>${value.medianWordReductionPct.toFixed(1)}%</td><td>${value.reduciblePairs}</td><td>${value.medianReducibleWordReductionPct.toFixed(1)}%</td></tr>`).join("");
+  fs.writeFileSync(path.join(destination, "report.html"), `<!doctype html><meta charset="utf-8"><title>Claudiator benchmark</title><style>body{font:16px system-ui;max-width:1200px;margin:40px auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px;text-align:left}</style><h1>Claudiator benchmark</h1><pre>${escapeHtml(JSON.stringify(metadata, null, 2))}</pre><p>Only matched pairs support cross-arm comparisons. Category and all-cell totals are descriptive.</p><h2>Paired with Default</h2><table>${pairedHeader}<tbody>${pairedRows(summary.pairedVsDefault)}</tbody></table><h2>Paired with Concise</h2><table>${pairedHeader}<tbody>${pairedRows(summary.pairedVsConcise)}</tbody></table><h2>By category</h2><table>${header}<tbody>${rowsFor(summary.byCategory, true)}</tbody></table><h2>All executed cells</h2><table>${header}<tbody>${rowsFor(summary.byArm)}</tbody></table>`);
 }
 
 function selftest() {
@@ -362,7 +381,10 @@ function selftest() {
   const strictBad = scoreCase({ exactOutput: "done", maxWords: 1, maxLines: 1 }, workspace, "done with extra prose");
   const depthGood = scoreCase({ minWords: 3 }, workspace, "one two three");
   const depthBad = scoreCase({ minWords: 3 }, workspace, "too short");
+  const equivalent = scoreCase({ requiredAnyOutput: [[/git status --short/, /git status -s/]], maxWords: 3 }, workspace, "```sh\ngit status -s\n```");
+  const mixed = scoreCase({ requiredOutput: [/done/], maxWords: 1 }, workspace, "done eventually");
   const metrics = outputMetrics("One two\n\nThree");
+  const fencedMetrics = outputMetrics("```sh\ngit status -s\n```");
   const order = seededOrder([1, 2, 3, 4]);
   const orderedCells = balancedOrder([
     { testCase: { id: "a" }, arm: "default", runNumber: 1 },
@@ -372,12 +394,13 @@ function selftest() {
   const summary = aggregate([
     { case: "paired", run: 1, arm: "default", category: "direct", pass: true, words: 10, sourceLines: 0, commentLines: 0, costUsd: 0, durationMs: 2 },
     { case: "paired", run: 1, arm: "claudiator", category: "direct", reducible: true, pass: true, words: 5, sourceLines: 0, commentLines: 0, costUsd: 0, durationMs: 2 },
+    { case: "paired", run: 1, arm: "concise", category: "direct", reducible: true, pass: true, words: 8, sourceLines: 0, commentLines: 0, costUsd: 0, durationMs: 2 },
     { case: "unpaired", run: 1, arm: "claudiator", category: "direct", pass: true, words: 1, sourceLines: 0, commentLines: 0, costUsd: 0, durationMs: 2 },
   ]);
   const holdout = cases.filter(({ suite }) => suite === "micro-holdout");
   const lockedDigest = fs.readFileSync(path.join(root, "benchmark", "micro-holdout.sha256"), "utf8").trim();
   fs.rmSync(workspace, { recursive: true, force: true });
-  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, depthGood.pass, !depthBad.pass, metrics.words === 3, metrics.paragraphs === 2, new Set(order).size === 4, orderedCells.slice(0, 2).every(({ budgetGroup }) => budgetGroup === "a:1:default+claudiator"), orderedCells.at(-1).arm === "concise", cases.length >= 36, pilotCases.length === 9, microSuites["micro-train"].length === 6, holdout.length === 6, caseFingerprint(holdout) === lockedDigest, summary.pairedVsDefault.claudiator.pairs === 1, summary.pairedVsDefault.claudiator.reduciblePairs === 1, summary.pairedVsDefault.claudiator.medianReducibleWordReductionPct === 50];
+  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, depthGood.pass, !depthBad.pass, equivalent.pass, mixed.contentPass && !mixed.presentationPass && !mixed.pass, metrics.words === 3, metrics.paragraphs === 2, fencedMetrics.words === 3, fencedMetrics.lines === 3, new Set(order).size === 4, orderedCells.slice(0, 2).every(({ budgetGroup }) => budgetGroup === "a:1:default+claudiator"), orderedCells.at(-1).arm === "concise", cases.length >= 42, pilotCases.length === 9, microSuites["micro-train"].length === 6, microSuites["micro-next-train"].length === 6, holdout.length === 6, caseFingerprint(holdout) === lockedDigest, summary.pairedVsDefault.claudiator.pairs === 1, summary.pairedVsDefault.claudiator.reduciblePairs === 1, summary.pairedVsDefault.claudiator.medianReducibleWordReductionPct === 50, summary.pairedVsConcise.claudiator.medianReducibleWordReductionPct === 37.5];
   if (checks.some((pass) => !pass)) throw new Error(`Benchmark self-test failed: ${JSON.stringify(checks)}`);
   process.stdout.write(`benchmark self-test: ${checks.length} checks passed; ${cases.length} cases\n`);
 }

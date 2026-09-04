@@ -1,6 +1,6 @@
 # Evaluation preregistration
 
-Status: **first micro holdout failed and retired**. Marketplace publication is blocked.
+Status: **revised development gate passed; independent holdout required**. Marketplace publication is blocked.
 
 Freeze this document after the pilot and before opening the holdout.
 
@@ -22,6 +22,8 @@ The micro holdout is frozen at three runs per case and arm. First-stage superior
 These criteria were frozen before any `micro-holdout` execution.
 
 The holdout ran once on 2026-09-04. Claudiator passed 13/18 cells versus 6/18 for both Default and Concise, with zero critical information losses and 51.6% median reducible-word reduction versus Default. It failed the required 18/18 correctness/format gate. See [results/MICRO-HOLDOUT-2026-09-04.md](results/MICRO-HOLDOUT-2026-09-04.md). The cases are retired and will not be used for product tuning.
+
+The revised development-only suite subsequently passed 18/18 for Claudiator. It does not rehabilitate the retired holdout or support a superiority claim. The next holdout must be authored independently and frozen under the revised grader contract.
 
 | Decision | Pilot output | Frozen value |
 |---|---|---|

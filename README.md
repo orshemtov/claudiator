@@ -94,6 +94,8 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Generation, artifact, subagent, and display hooks | Implemented |
 | Protected-comment tests | Implemented |
 | Native eval suite | Authored; native runner account-gated |
-| Comparative corpus | 24 broad cases plus 12-case micro train/holdout gate |
+| Comparative corpus | 24 broad cases plus 18 micro training/holdout cases |
 | Micro holdout | Failed 13/18; retired and reported transparently |
+| Revised development gate | Claudiator 18/18; Default 9/18; Concise 10/18 |
+| Independent holdout | Required before a superiority claim |
 | Marketplace publication | Blocked |

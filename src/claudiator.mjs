@@ -25,7 +25,7 @@ export function deriveContract(prompt = "") {
   const strict = STRICT_FORMAT_RE.test(prompt);
   const shape = depth === "minimum" && strict && /\bimmediate\b.{0,40}\baction\b/i.test(prompt)
     ? "single-action"
-    : depth === "minimum" && strict && /\bcommand\b/i.test(prompt) && /\bwarning\b/i.test(prompt)
+    : depth === "minimum" && strict && /\bwarning\b/i.test(prompt) && (/\bcommand\b/i.test(prompt) || /`[^`\n]+\s+[^`\n]+`/.test(prompt))
       ? "command-warning"
       : depth === "minimum" && /\bdefine\b/i.test(prompt) && /\bone sentence\b/i.test(prompt)
         ? "single-sentence-definition"
