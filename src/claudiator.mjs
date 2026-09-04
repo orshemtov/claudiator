@@ -392,6 +392,15 @@ export async function handleHook(input = {}, options = envOptions(), dependencie
       additionalContext: "Return only findings, exact evidence, changes made, and unresolved risks. Use bullets or a compact table. No preamble, narration, history, or recap.",
     });
   }
+  if (event === "SubagentStop") {
+    if (input.stop_hook_active) return {};
+    const result = compress(input.last_assistant_message ?? "");
+    if (!result.changed || result.removedLines < 2) return {};
+    return {
+      decision: "block",
+      reason: "Rewrite once without preamble, repeated conclusions, narration, or closing filler; preserve findings, exact evidence, changes, and unresolved risks.",
+    };
+  }
   if (event === "PreToolUse") {
     let inspected = input;
     if (input.tool_name === "Write" && input.tool_input?.file_path && dependencies.readFile) {

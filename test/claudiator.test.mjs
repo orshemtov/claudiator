@@ -232,6 +232,20 @@ test("handleHook emits Claude Code context and gate schemas", async () => {
     },
   });
   assert.equal(blocked.hookSpecificOutput.permissionDecision, "deny");
+
+  const subagentStop = await handleHook({
+    hook_event_name: "SubagentStop",
+    stop_hook_active: false,
+    last_assistant_message: "Certainly!\n\nDone.\n\nDone.\n\nLet me know if you need anything else.",
+  });
+  assert.equal(subagentStop.decision, "block");
+
+  const repairedStop = await handleHook({
+    hook_event_name: "SubagentStop",
+    stop_hook_active: true,
+    last_assistant_message: "Done.",
+  });
+  assert.deepEqual(repairedStop, {});
 });
 
 test("semantic display uses verified output and falls back to the original", async () => {
@@ -368,6 +382,9 @@ test("plugin metadata exposes a forced output style and every production hook", 
   for (const event of ["UserPromptSubmit", "SubagentStart", "SubagentStop", "PreToolUse", "MessageDisplay", "SessionEnd"]) {
     assert.ok(hooks.hooks[event], `${event} hook is registered`);
   }
+  const handlers = Object.values(hooks.hooks).flatMap((groups) => groups.flatMap(({ hooks: eventHooks }) => eventHooks));
+  assert.ok(handlers.every(({ type }) => type === "command"), "production hooks must not invoke another model");
+  assert.ok(handlers.every(({ model }) => model === undefined), "production hooks must not require model access");
 });
 
 test("hook runner reads one event from stdin and writes only Claude hook JSON", () => {
