@@ -16,7 +16,7 @@ import {
   verifyPreservation,
 } from "../src/claudiator.mjs";
 
-test("deriveContract selects terminal-friendly structure and honors requested depth", () => {
+test("deriveContract selects terminal-friendly structure and honors requested depth", async () => {
   assert.equal(deriveContract("Compare these three options").representation, "table");
   assert.equal(deriveContract("Show the request flow in Claude Code").representation, "ascii");
   assert.equal(deriveContract("Explain this thoroughly").depth, "detailed");
@@ -33,7 +33,7 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("Explain thoroughly and define the term in one sentence.").shape, "default");
   assert.deepEqual(
     { shape: deriveContract("A batch processed 148 records and rejected 23. How many were accepted?").shape, limit: deriveContract("A batch processed 148 records and rejected 23. How many were accepted?").wordLimit },
-    { shape: "direct-answer", limit: 6 },
+    { shape: "direct-answer", limit: 4 },
   );
   assert.equal(deriveContract("Draft an internal status update for engineers and support.").shape, "status-update");
   assert.equal(deriveContract("Please make sure telemetry is disabled in settings.json.").shape, "change-result");
@@ -41,10 +41,13 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   const destructive = deriveContract("Permanently remove /srv/app/build-cache and its nested contents. What shell commands should I use?");
   assert.equal(destructive.shape, "destructive-command");
   assert.equal(destructive.target, "/srv/app/build-cache");
-  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 500);
+  assert.equal(deriveContract("Give me a detailed explanation of HTTP caching.").wordLimit, 450);
   assert.equal(deriveContract("Give me a detailed 800-word explanation of HTTP caching.").wordLimit, 800);
   assert.equal(deriveContract("Write a detailed 180-220 word explanation.").wordLimit, 220);
   assert.equal(deriveContract("What is causing intermittent data loss in this distributed system?").shape, "default");
+  const destructiveHook = await handleHook({ hook_event_name: "UserPromptSubmit", prompt: "Permanently remove /srv/app/build-cache." });
+  assert.match(destructiveHook.hookSpecificOutput.additionalContext, /realpath -- TARGET/);
+  assert.match(destructiveHook.hookSpecificOutput.additionalContext, /never add sudo/i);
 });
 
 test("classifyComments protects tooling and rejects narration", () => {

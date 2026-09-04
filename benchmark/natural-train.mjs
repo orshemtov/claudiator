@@ -95,7 +95,7 @@ export const naturalTrainCases = [
     category: "correct-no-op",
     reducible: true,
     prompt: "Please make sure debug logging is disabled in config.json.",
-    requiredOutput: [/no changes (?:are )?needed|debug(?: logging)? is already disabled/i],
+    requiredOutput: [/no changes (?:are )?needed|debug(?: logging)? (?:is )?already disabled/i],
     maxWords: 6,
     maxLines: 1,
     allowedTools: ["Read"],
