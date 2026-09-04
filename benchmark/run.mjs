@@ -114,10 +114,18 @@ function testPatterns(text, patterns = []) {
 
 function testJavascript(content, spec) {
   const program = `
+    import vm from "node:vm";
     const [source, specification] = process.argv.slice(1);
-    const module = await import("data:text/javascript;base64," + source);
     const config = JSON.parse(specification);
-    const fn = module[config.export];
+    let loaded;
+    if (config.format === "commonjs") {
+      const module = { exports: {} };
+      vm.runInNewContext(Buffer.from(source, "base64").toString("utf8"), { module, exports: module.exports });
+      loaded = module.exports;
+    } else {
+      loaded = await import("data:text/javascript;base64," + source);
+    }
+    const fn = loaded[config.export];
     if (typeof fn !== "function") process.exit(2);
     for (const test of config.calls ?? []) {
       if (!Object.is(fn(...test.args), test.equals)) process.exit(3);
@@ -401,7 +409,7 @@ function writeReport(destination, metadata, rows) {
 
 function selftest() {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "claudiator-bench-"));
-  writeSeed(workspace, { "a.js": "export const a = 1;\n", "clamp.js": "export const clamp = (value, min, max) => { if (min > max) throw new RangeError(); return Math.max(min, Math.min(value, max)); };\n" });
+  writeSeed(workspace, { "a.js": "export const a = 1;\n", "clamp.js": "export const clamp = (value, min, max) => { if (min > max) throw new RangeError(); return Math.max(min, Math.min(value, max)); };\n", "initials.js": "function initials(name) { if (typeof name !== 'string') throw new TypeError(); return name.trim().split(/\\s+/).filter(Boolean).map((part) => part[0].toUpperCase()).join(''); }\nmodule.exports = { initials };\n" });
   const good = scoreCase({ requiredOutput: [/done/], forbiddenOutput: [/certainly/i] }, workspace, "done");
   const bad = scoreCase({ requiredOutput: [/done/], forbiddenOutput: [/certainly/i] }, workspace, "Certainly not done");
   const strictGood = scoreCase({ exactOutput: "done", maxWords: 1, maxLines: 1 }, workspace, "done");
@@ -411,6 +419,7 @@ function selftest() {
   const equivalent = scoreCase({ requiredAnyOutput: [[/git status --short/, /git status -s/]], maxWords: 3 }, workspace, "```sh\ngit status -s\n```");
   const mixed = scoreCase({ requiredOutput: [/done/], maxWords: 1 }, workspace, "done eventually");
   const executable = scoreCase({ files: [{ path: "clamp.js", javascript: { export: "clamp", calls: [{ args: [5, 0, 10], equals: 5 }, { args: [-1, 0, 10], equals: 0 }, { args: [11, 0, 10], equals: 10 }], throws: [{ args: [1, 2, 0], name: "RangeError" }] } }] }, workspace, "done");
+  const commonjsExecutable = scoreCase({ files: [{ path: "initials.js", javascript: { format: "commonjs", export: "initials", calls: [{ args: [" Ada  Lovelace "], equals: "AL" }, { args: ["   "], equals: "" }], throws: [{ args: [42], name: "TypeError" }] } }] }, workspace, "done");
   const brokenExecutable = scoreCase({ files: [{ path: "a.js", javascript: { export: "a", calls: [{ args: [], equals: 1 }] } }] }, workspace, "done");
   const metrics = outputMetrics("One two\n\nThree");
   const fencedMetrics = outputMetrics("```sh\ngit status -s\n```");
@@ -428,10 +437,12 @@ function selftest() {
   ]);
   const holdout = cases.filter(({ suite }) => suite === "micro-holdout");
   const independentHoldout = cases.filter(({ suite }) => suite === "independent-holdout");
+  const freshIndependentHoldout = cases.filter(({ suite }) => suite === "fresh-independent-holdout");
   const lockedDigest = fs.readFileSync(path.join(root, "benchmark", "micro-holdout.sha256"), "utf8").trim();
   const independentDigest = fs.readFileSync(path.join(root, "benchmark", "independent-holdout.sha256"), "utf8").trim();
+  const freshIndependentDigest = fs.readFileSync(path.join(root, "benchmark", "fresh-independent-holdout.sha256"), "utf8").trim();
   fs.rmSync(workspace, { recursive: true, force: true });
-  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, depthGood.pass, !depthBad.pass, equivalent.pass, mixed.contentPass && !mixed.presentationPass && !mixed.pass, executable.pass, !brokenExecutable.pass, metrics.words === 3, metrics.paragraphs === 2, fencedMetrics.words === 3, fencedMetrics.lines === 3, new Set(order).size === 4, orderedCells.slice(0, 2).every(({ budgetGroup }) => budgetGroup === "a:1:default+claudiator"), orderedCells.at(-1).arm === "concise", JSON.stringify(toolArgs([])) === JSON.stringify(["--tools", ""]), JSON.stringify(toolArgs(["Read", "Read"])) === JSON.stringify(["--allowedTools", "Read"]), cases.length >= 54, new Set(cases.map(({ id }) => id)).size === cases.length, pilotCases.length === 9, microSuites["micro-train"].length === 6, microSuites["micro-next-train"].length === 6, microSuites["natural-train"].length === 6, holdout.length === 6, caseFingerprint(holdout) === lockedDigest, independentHoldout.length === 6, caseFingerprint(independentHoldout) === independentDigest, summary.pairedVsDefault.claudiator.pairs === 1, summary.pairedVsDefault.claudiator.reduciblePairs === 1, summary.pairedVsDefault.claudiator.medianReducibleWordReductionPct === 50, summary.pairedVsConcise.claudiator.medianReducibleWordReductionPct === 37.5];
+  const checks = [good.pass, !bad.pass, strictGood.pass, !strictBad.pass, depthGood.pass, !depthBad.pass, equivalent.pass, mixed.contentPass && !mixed.presentationPass && !mixed.pass, executable.pass, commonjsExecutable.pass, !brokenExecutable.pass, metrics.words === 3, metrics.paragraphs === 2, fencedMetrics.words === 3, fencedMetrics.lines === 3, new Set(order).size === 4, orderedCells.slice(0, 2).every(({ budgetGroup }) => budgetGroup === "a:1:default+claudiator"), orderedCells.at(-1).arm === "concise", JSON.stringify(toolArgs([])) === JSON.stringify(["--tools", ""]), JSON.stringify(toolArgs(["Read", "Read"])) === JSON.stringify(["--allowedTools", "Read"]), cases.length >= 60, new Set(cases.map(({ id }) => id)).size === cases.length, pilotCases.length === 9, microSuites["micro-train"].length === 6, microSuites["micro-next-train"].length === 6, microSuites["natural-train"].length === 6, holdout.length === 6, caseFingerprint(holdout) === lockedDigest, independentHoldout.length === 6, caseFingerprint(independentHoldout) === independentDigest, freshIndependentHoldout.length === 6, caseFingerprint(freshIndependentHoldout) === freshIndependentDigest, summary.pairedVsDefault.claudiator.pairs === 1, summary.pairedVsDefault.claudiator.reduciblePairs === 1, summary.pairedVsDefault.claudiator.medianReducibleWordReductionPct === 50, summary.pairedVsConcise.claudiator.medianReducibleWordReductionPct === 37.5];
   if (checks.some((pass) => !pass)) throw new Error(`Benchmark self-test failed: ${JSON.stringify(checks)}`);
   process.stdout.write(`benchmark self-test: ${checks.length} checks passed; ${cases.length} cases\n`);
 }

@@ -2,6 +2,32 @@
 
 Status: **independent micro holdout failed and retired**. Marketplace publication is blocked.
 
+## Fresh independent holdout
+
+Status: **frozen, not yet run**.
+
+The replacement suite was authored by a new context-isolated agent forbidden from inspecting Claudiator, its repository, experiments, prior cases, or results. A second context-isolated reviewer corrected only evaluator methodology before freeze. The reviewed suite contains six natural prompts and has fingerprint:
+
+```text
+803a84279e51ef9834aeb711c6f7627a069a59a4c385779404f6c75982b6f7a8
+```
+
+The run is frozen at six cases, three repeats, and three arms: Default, built-in Concise, and Claudiator. It uses Claude Code 2.1.260, Haiku, isolated workspaces and settings, randomized matched ordering, and a `$1.25` reported-cost ceiling for 54 cells.
+
+The gate passes only if:
+
+- Critical safety or required-information losses are zero.
+- Claudiator passes all 18 content and all 18 presentation cells.
+- Claudiator's overall pass count exceeds both controls.
+- Median visible-word reduction on the 15 reducible matched pairs is at least 30% versus Default and Concise.
+- The shell case preserves its exact root, regular-file and age predicates, filesystem boundary, safe filename handling, and predicate-before-deletion order in every run.
+- The depth case remains technically correct, covers every frozen topic, and stays within 350–800 words in every run.
+- The CommonJS artifact passes executable behavior checks, changes only one file, adds no dependency or comments, and stays within ten non-empty lines in every run.
+- The no-op case leaves the repository unchanged and truthfully reports the existing LF configuration in every run.
+- The unchanged suite, all failures, costs, and limitations are published.
+
+Passing funds small repository-level greenfield, brownfield, bug-fix, and Ponytail comparisons. It does not itself authorize marketplace publication.
+
 ## Independent micro holdout
 
 The six cases were authored by a context-isolated agent that was forbidden from inspecting the repository, implementation, prior cases, or results. A methodology review rejected its first draft before freeze because the prompts prescribed concise outputs; the author independently replaced it with natural prompts whose hidden graders define the desired presentation.
