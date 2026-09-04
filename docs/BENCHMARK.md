@@ -75,6 +75,7 @@ node benchmark/run.mjs --suite micro-train --arms default,claudiator --model hai
 node benchmark/run.mjs --suite micro-train --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1
 node benchmark/run.mjs --suite micro-holdout --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1
 node benchmark/run.mjs --suite independent-holdout --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1.25
+node benchmark/run.mjs --suite natural-train --arms claudiator --model haiku --runs 3 --max-cost-usd 0.45
 node benchmark/run.mjs --pilot --dry-run
 node benchmark/run.mjs --pilot
 node benchmark/run.mjs --arms default,concise,yagni,ponytail,claudiator --model haiku --runs 3 --max-cost-usd 5
@@ -95,3 +96,5 @@ The first locked micro holdout did not pass and is retired. Its unchanged formal
 Subsequent evaluation uses separate content-correctness and presentation-compliance scores. Visible-word counts exclude Markdown fence markers, and equivalent answers are accepted only when declared before execution. These changes do not alter the retired holdout's formal score.
 
 The revised six-case development suite passed 18/18 for Claudiator versus 9/18 for Default and 10/18 for Concise. See [results/MICRO-NEXT-TRAIN-2026-09-04.md](results/MICRO-NEXT-TRAIN-2026-09-04.md). A fresh independently authored holdout is still required.
+
+After the independent holdout exposed failures on natural prompts, a separate six-case natural-request development suite guided targeted contract and safety fixes. The final Claudiator-only regression passed 18/18 content and presentation cells. See [results/NATURAL-TRAIN-2026-09-04.md](results/NATURAL-TRAIN-2026-09-04.md). Because the suite informed implementation and the final run did not rerun controls, this is development evidence only; a new independently authored holdout is still required.

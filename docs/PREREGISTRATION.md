@@ -86,5 +86,6 @@ Changing a frozen threshold invalidates the holdout and requires a new holdout s
 | The first micro gate isolates six cheap response shapes from repository implementation work | Prove reliable control before funding larger greenfield and brownfield comparisons |
 | Three-run micro training: Default 10/18, Concise 11/18, current Claudiator 18/18 | Open the frozen micro holdout without further tuning |
 | Current Claudiator reduced the nine reducible training pairs by a 63.4% median versus Default | Keep the preregistered holdout floor at 30%; do not raise it after observing training |
+| Natural-request development: Claudiator improved from 15/18 to 18/18 after targeted status and depth fixes; earlier controls scored 3/18 each | The diagnosed simple cases are ready for a fresh independent holdout; do not claim superiority from tuned cases |
 
 These observations are exploratory. They do not freeze thresholds or support a superiority claim.
