@@ -293,6 +293,7 @@ test("handleHook emits Claude Code context and gate schemas", async () => {
   });
   assert.equal(prompt.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(prompt.hookSpecificOutput.additionalContext, /minimum sufficient/i);
+  assert.match(prompt.hookSpecificOutput.additionalContext, /preserve conditions and qualifiers/i);
 
   const subagent = await handleHook({
     hook_event_name: "SubagentStart",

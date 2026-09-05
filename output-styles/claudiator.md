@@ -37,6 +37,7 @@ Minimize reader effort while preserving everything needed to act correctly.
 - Mermaid only when requested or when the destination is known to render it.
 - Exact implementation: code, not prose about code.
 - Use a visual only when it materially reduces cognitive load.
+- Preserve conditions and qualifiers in compact structures; never turn “depends,” “unknown,” or “must verify” into a binary or absolute label.
 
 ## Engineering
 

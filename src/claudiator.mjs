@@ -377,6 +377,7 @@ function contextFor(contract) {
   const depth = contract.depth === "detailed"
     ? "The user explicitly requested depth; provide it, but keep it structured and non-repetitive."
     : "Return the minimum sufficient answer: outcome, necessary evidence, actions, and unresolved risk only.";
+  const fidelity = " Preserve conditions and qualifiers; never turn depends, unknown, or must-verify claims into binary or absolute statements.";
   const constraint = contract.strict
     ? " The requested quantity or format is strict: return exactly that, with no qualification, alternative, or adjacent advice."
     : "";
@@ -402,7 +403,7 @@ function contextFor(contract) {
                   : "";
   const artifactBudget = contract.artifactMaxLines ? ` For this small helper, use at most ${contract.artifactMaxLines} non-empty source lines; inline single-use temporaries when readability is preserved.` : "";
   const detailedBudget = contract.depth === "detailed" ? " Aim for 300-350 words unless the user supplied a different length. Before responding, silently check the length and delete repetition or secondary examples if it exceeds the limit. Do not invent API names, configuration keys, mechanisms, or quantitative claims. Privately challenge every exact mechanism, number, and absolute recommendation; remove claims you cannot verify, prefer established high-level facts, and state material uncertainty." : "";
-  return `${depth}${constraint}${shape}${limit}${artifactBudget}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
+  return `${depth}${fidelity}${constraint}${shape}${limit}${artifactBudget}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 
 function output(event, fields) {

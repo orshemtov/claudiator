@@ -49,7 +49,7 @@ export const recoveryTrainCases = [
     suite: "recovery-train",
     category: "source-grounded-depth",
     reducible: false,
-    prompt: `Using only the evidence packet below, give a deep but practical comparison of SQLite WAL and rollback-journal modes for a local desktop database with simultaneous readers, periodic writes, live backups, and a possible network-mounted data directory. Cover locking, commits and recovery, checkpoints, backup choices, and a recommendation. Do not introduce mechanisms, pragma names, timing claims, or settings absent from the packet.
+    prompt: `Rewrite the evidence packet below as a concise, practical comparison of SQLite WAL and rollback-journal modes for a local desktop database with simultaneous readers, periodic writes, live backups, and a possible network-mounted data directory. Preserve every decision-relevant fact, use at most 260 words, and add nothing not stated in the packet.
 
 Evidence packet:
 - Both modes allow only one writer at a time.
@@ -60,7 +60,7 @@ Evidence packet:
 - Rollback mode still depends on the VFS and filesystem providing correct locking and durability semantics; network-mounted behavior must be verified and multi-host direct access should be avoided.
 - For a live consistent backup in either mode, prefer SQLite's online backup API instead of copying active database sidecar files. A cold copy is appropriate only after all connections are closed and the database files are quiescent.
 - Prefer WAL on verified local storage for simultaneous readers and periodic writes. If the database directory may be network-mounted, keep the live database local and copy a database-level backup to the mount.`,
-    requiredOutput: [/\bWAL\b/, /rollback[- ]journal/i, /\block/i, /\bcheckpoint/i, /\bbackup/i, /network (?:file system|filesystem|mount)/i, /\b(?:uncertain|depends|dependent|verify|test|VFS|locking semantics)\b/i],
+    requiredOutput: [/\bWAL\b/, /\brollback(?:[- ]journal| mode)?\b/i, /\block/i, /\bcheckpoint/i, /\bbackup/i, /network (?:file system|filesystem|mount)/i, /\b(?:uncertain|depends|dependent|verify|test|VFS|locking semantics)\b/i],
     forbiddenOutput: [
       /checkpoint_interval/i,
       /rollback[- ]journal[^\n.]{0,160}wal_checkpoint/i,
@@ -74,9 +74,14 @@ Evidence packet:
       /corrupt silently/i,
       /\bPRAGMA\b/i,
       /\b(?:milliseconds?|\d+[-–]\d+x|times faster)\b/i,
+      /\bno lock required\b/i,
+      /\b(?:unbounded|unchecked) (?:WAL )?growth\b/i,
+      /\b(?:avoids?|needs?) (?:an? )?EXCLUSIVE(?: database)? lock\b/i,
+      /\b(?:reduces?|lower) (?:writer |commit )?latency\b/i,
+      /\b(?:requires?|must use) (?:SQLite's )?online backup API\b/i,
+      /rollback[^\n|.]{0,120}(?:not supported|incompatible)[^\n|.]{0,80}network/i,
     ],
-    minWords: 300,
-    maxWords: 520,
+    maxWords: 260,
     allowedTools: [],
     seed: {},
     files: [],

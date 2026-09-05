@@ -100,5 +100,5 @@ Local metrics contain event names, character counts, and timings only. Prompts, 
 | Independent holdout | Failed 4/18; retired and reported transparently |
 | Natural-request development gate | Claudiator 18/18 after targeted fixes; controls previously scored 3/18 each |
 | Fresh independent holdout | Failed 11/18; retired and reported transparently |
-| Recovery development gate | Mechanical gaps fixed; source-grounded depth evaluation pending Claude login |
+| Recovery development gate | Mechanical gaps fixed; source-grounded compression remains 2/3 and unresolved |
 | Marketplace publication | Blocked |
