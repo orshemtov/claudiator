@@ -77,6 +77,7 @@ node benchmark/run.mjs --suite micro-holdout --arms default,concise,claudiator -
 node benchmark/run.mjs --suite independent-holdout --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1.25
 node benchmark/run.mjs --suite fresh-independent-holdout --arms default,concise,claudiator --model haiku --runs 3 --max-cost-usd 1.25
 node benchmark/run.mjs --suite natural-train --arms claudiator --model haiku --runs 3 --max-cost-usd 0.45
+node benchmark/run.mjs --suite recovery-train --arms claudiator --model haiku --runs 3 --max-cost-usd 0.30
 node benchmark/run.mjs --pilot --dry-run
 node benchmark/run.mjs --pilot
 node benchmark/run.mjs --arms default,concise,yagni,ponytail,claudiator --model haiku --runs 3 --max-cost-usd 5
@@ -101,3 +102,5 @@ The revised six-case development suite passed 18/18 for Claudiator versus 9/18 f
 After the independent holdout exposed failures on natural prompts, a separate six-case natural-request development suite guided targeted contract and safety fixes. The final Claudiator-only regression passed 18/18 content and presentation cells. See [results/NATURAL-TRAIN-2026-09-04.md](results/NATURAL-TRAIN-2026-09-04.md). Because the suite informed implementation and the final run did not rerun controls, this is development evidence only; a new independently authored holdout is still required.
 
 The fresh independent holdout subsequently failed 11/18. It strongly beat both controls on total passes and Default on reducible words, but missed artifact compactness, shell presentation consistency, semantic accuracy, and the 30% reduction threshold versus Concise. See [results/FRESH-INDEPENDENT-HOLDOUT-2026-09-04.md](results/FRESH-INDEPENDENT-HOLDOUT-2026-09-04.md). Do not fund larger application trials until development cases address those failure classes and another independent holdout passes.
+
+The recovery suite separates source-grounded compression fidelity from ungrounded model factuality. Claudiator must preserve a supplied evidence packet without adding unsupported precision; separate same-model controls determine whether ungrounded technical accuracy is non-inferior. Claudiator does not claim to make the underlying model more knowledgeable. See [results/RECOVERY-TRAIN-2026-09-05.md](results/RECOVERY-TRAIN-2026-09-05.md).

@@ -38,6 +38,12 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   assert.equal(deriveContract("Draft an internal status update for engineers and support.").shape, "status-update");
   assert.equal(deriveContract("Please make sure telemetry is disabled in settings.json.").shape, "change-result");
   assert.equal(deriveContract("Add a small JavaScript utility named clamp.js.").shape, "implementation-result");
+  assert.equal(deriveContract("Add a small JavaScript utility named clamp.js.").artifactMaxLines, 10);
+  const cleanup = deriveContract("Delete regular files older than 7 days under /var/log/app without crossing filesystem boundaries.");
+  assert.equal(cleanup.shape, "bounded-cleanup-command");
+  assert.equal(cleanup.wordLimit, 30);
+  assert.equal(cleanup.ageDays, 7);
+  assert.equal(deriveContract("Delete .tmp files older than 10 days under /var/cache/comet.").filePattern, "*.tmp");
   const destructive = deriveContract("Permanently remove /srv/app/build-cache and its nested contents. What shell commands should I use?");
   assert.equal(destructive.shape, "destructive-command");
   assert.equal(destructive.target, "/srv/app/build-cache");
@@ -48,6 +54,8 @@ test("deriveContract selects terminal-friendly structure and honors requested de
   const destructiveHook = await handleHook({ hook_event_name: "UserPromptSubmit", prompt: "Permanently remove /srv/app/build-cache." });
   assert.match(destructiveHook.hookSpecificOutput.additionalContext, /realpath -- TARGET/);
   assert.match(destructiveHook.hookSpecificOutput.additionalContext, /never add sudo/i);
+  const detailedHook = await handleHook({ hook_event_name: "UserPromptSubmit", prompt: "Give me a deep technical comparison." });
+  assert.match(detailedHook.hookSpecificOutput.additionalContext, /do not invent/i);
 });
 
 test("classifyComments protects tooling and rejects narration", () => {
@@ -103,6 +111,26 @@ test("artifact gate preserves meaningful markers and blocks obvious comment bloa
   });
   assert.equal(bloated.allow, false);
   assert.match(bloated.reason, /narrat/i);
+});
+
+test("artifact gate rejects vertical sprawl only for contracted tiny artifacts", () => {
+  const content = [
+    "function initials(name) {",
+    "  if (typeof name !== 'string') {",
+    "    throw new TypeError();",
+    "  }",
+    "  const clean = name.trim();",
+    "  if (!clean) {",
+    "    return '';",
+    "  }",
+    "  return clean.split(/\\s+/)",
+    "    .map((part) => part[0].toUpperCase())",
+    "    .join('');",
+    "}",
+    "module.exports = { initials };",
+  ].join("\n");
+  assert.equal(inspectArtifact({ tool_name: "Write", tool_input: { file_path: "/repo/initials.js", content } }, { artifactMaxLines: 10 }).allow, false);
+  assert.equal(inspectArtifact({ tool_name: "Write", tool_input: { file_path: "/repo/initials.js", content } }).allow, true);
 });
 
 test("artifact gate does not mistake preserved existing TODOs for new comments", () => {
@@ -234,6 +262,27 @@ test("strict local display buffers and selects only the contracted units", async
   await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "status", prompt: "Draft an internal status update for engineering and support." }, {}, { store });
   const status = await handleHook({ hook_event_name: "MessageDisplay", session_id: "status", message_id: "m", index: 0, final: true, delta: "**Status:** Ongoing\n\n**Impact:** All requests fail\n\n**Next update:** 09:10 UTC" }, {}, { store });
   assert.equal(status.hookSpecificOutput.displayContent, "**Status:** Ongoing **Impact:** All requests fail **Next update:** 09:10 UTC");
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "cleanup", prompt: "Delete regular files older than 7 days under /var/log/app without crossing filesystem boundaries." }, {}, { store });
+  const cleanup = await handleHook({ hook_event_name: "MessageDisplay", session_id: "cleanup", message_id: "m", index: 0, final: true, delta: "```sh\nfind /var/log/app -xdev -type f -mtime +7 -delete\n```\n\nThis deletion is irreversible. The flags keep the operation on one filesystem and select old regular files." }, {}, { store });
+  assert.equal(cleanup.hookSpecificOutput.displayContent, "find /var/log/app -xdev -type f -mtime +7 -delete\nThis deletion is irreversible.");
+
+  const unsafeCleanupText = "```sh\nfind /var/log/app -type f -mtime +7 -delete\n```\n\nThis deletion is irreversible.";
+  const unsafeCleanup = await handleHook({ hook_event_name: "MessageDisplay", session_id: "cleanup", message_id: "unsafe", index: 0, final: true, delta: unsafeCleanupText }, {}, { store });
+  assert.equal(unsafeCleanup.hookSpecificOutput.displayContent, unsafeCleanupText);
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "tmp-cleanup", prompt: "Delete .tmp files older than 10 days under /var/cache/comet without crossing filesystem boundaries." }, {}, { store });
+  const wrongScopeText = "```sh\nfind /var/cache/comet -xdev -type f -mtime +7 -delete\n```\n\nThis deletion is irreversible.";
+  const wrongScope = await handleHook({ hook_event_name: "MessageDisplay", session_id: "tmp-cleanup", message_id: "wrong-scope", index: 0, final: true, delta: wrongScopeText }, {}, { store });
+  assert.equal(wrongScope.hookSpecificOutput.displayContent, wrongScopeText);
+
+  await handleHook({ hook_event_name: "UserPromptSubmit", session_id: "implementation", prompt: "Add a small utility in initials.js." }, {}, { store });
+  const implementation = await handleHook({ hook_event_name: "MessageDisplay", session_id: "implementation", message_id: "m", index: 0, final: true, delta: "Created `initials.js` with `initials(name)`. It trims input, splits words, and uppercases their first letters." }, {}, { store });
+  assert.equal(implementation.hookSpecificOutput.displayContent, "Created `initials.js` with `initials(name)`.");
+
+  const anchoredImplementationText = "Created `initials.js`. Validation still requires `npm test`.";
+  const anchoredImplementation = await handleHook({ hook_event_name: "MessageDisplay", session_id: "implementation", message_id: "anchored", index: 0, final: true, delta: anchoredImplementationText }, {}, { store });
+  assert.equal(anchoredImplementation.hookSpecificOutput.displayContent, anchoredImplementationText);
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

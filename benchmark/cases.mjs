@@ -1,6 +1,7 @@
 import { independentHoldoutCases } from "./independent-holdout.mjs";
 import { freshIndependentHoldoutCases } from "./fresh-independent-holdout.mjs";
 import { naturalTrainCases } from "./natural-train.mjs";
+import { recoveryTrainCases } from "./recovery-train.mjs";
 
 const file = (path, patterns = [], forbidden = [], limits = {}) => ({ path, patterns, forbidden, ...limits });
 
@@ -378,6 +379,7 @@ export const cases = [
   ...independentHoldoutCases,
   ...freshIndependentHoldoutCases,
   ...naturalTrainCases,
+  ...recoveryTrainCases,
 ];
 
 export const microSuites = {
@@ -387,4 +389,5 @@ export const microSuites = {
   "independent-holdout": cases.filter(({ suite }) => suite === "independent-holdout").map(({ id }) => id),
   "fresh-independent-holdout": cases.filter(({ suite }) => suite === "fresh-independent-holdout").map(({ id }) => id),
   "natural-train": cases.filter(({ suite }) => suite === "natural-train").map(({ id }) => id),
+  "recovery-train": cases.filter(({ suite }) => suite === "recovery-train").map(({ id }) => id),
 };

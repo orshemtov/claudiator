@@ -20,14 +20,21 @@ const COMMENTED_CODE_RE = /^(?:const|let|var|if|for|while|return|function|class|
 const ACTION_START_RE = /^(?:immediately\s+)?(?:revoke|rotate|remove|delete|disable|stop|replace|change|restart|retry|run|contact|report|isolate|disconnect|restore|reset|cancel|close|open|use|enable|block|deny|lock|patch|upgrade|fix)\b/i;
 const DESTRUCTIVE_WARNING_RE = /\b(?:warning|delete|remove|destructive|irreversib\w*|permanent\w*|untracked|cannot be undone)\b/i;
 const DESTRUCTIVE_REQUEST_RE = /\b(?:permanently|recursive(?:ly)?|nested contents|rm\s+-[a-z]*r|delete .*cannot be undone)\b/i;
+const BOUNDED_CLEANUP_RE = /(?:\b(?:delete|remove)\b[\s\S]{0,160}\bfiles?\b[\s\S]{0,80}\bolder than\b|\bolder than\b[\s\S]{0,80}\b(?:delete|remove)\b)/i;
 const STATUS_REQUEST_RE = /\b(?:status|incident|service) update\b/i;
 const CHANGE_RESULT_RE = /\b(?:make sure|ensure|verify)\b[\s\S]{0,120}\b(?:disabled|enabled|configured|set|contains?)\b/i;
 const IMPLEMENTATION_RE = /\b(?:add|create|implement|fix|refactor|update)\b[\s\S]{0,160}(?:\.[a-z0-9]+\b|\bfunction\b|\bcode\b|\bfile\b|\butility\b)/i;
 const DIRECT_ANSWER_RE = /\bhow many\b|\bwhat(?:'s| is)\s+[-+*/().\d\s]+\??$/i;
-const BUFFERED_SHAPES = new Set(["single-action", "command-warning", "single-sentence-definition", "direct-answer", "status-update", "change-result", "implementation-result", "destructive-command"]);
+const BUFFERED_SHAPES = new Set(["single-action", "command-warning", "single-sentence-definition", "direct-answer", "status-update", "change-result", "implementation-result", "destructive-command", "bounded-cleanup-command"]);
 
 function requestedTarget(prompt) {
   return String(prompt).match(/(?:^|[\s`'"])(\/(?:[\w.@%+~-]+\/)*[\w.@%+~-]+)/)?.[1];
+}
+
+function requestedCleanup(prompt) {
+  const extension = String(prompt).match(/\.([a-z0-9]+)\s+files?\b/i)?.[1];
+  const ageDays = Number(String(prompt).match(/older than\s+(\d+)\s+days?\b/i)?.[1]) || undefined;
+  return { filePattern: extension ? `*.${extension}` : undefined, ageDays };
 }
 
 function requestedWordLimit(prompt) {
@@ -46,6 +53,8 @@ export function deriveContract(prompt = "") {
       ? "command-warning"
       : depth === "minimum" && /\bdefine\b/i.test(prompt) && /\bone sentence\b/i.test(prompt)
         ? "single-sentence-definition"
+        : depth === "minimum" && BOUNDED_CLEANUP_RE.test(prompt) && requestedTarget(prompt)
+          ? "bounded-cleanup-command"
         : depth === "minimum" && DESTRUCTIVE_REQUEST_RE.test(prompt)
           ? "destructive-command"
           : depth === "minimum" && STATUS_REQUEST_RE.test(prompt)
@@ -66,6 +75,7 @@ export function deriveContract(prompt = "") {
     "change-result": 6,
     "implementation-result": 30,
     "destructive-command": 80,
+    "bounded-cleanup-command": 30,
   };
   const wordLimit = requestedWordLimit(prompt) ?? (depth === "detailed" ? 350 : limits[shape] ?? (COMPACT_RE.test(prompt) && /\bimmediate\b/i.test(prompt) ? 12 : undefined));
   let representation = "sentence";
@@ -73,7 +83,9 @@ export function deriveContract(prompt = "") {
   else if (TABLE_RE.test(prompt)) representation = "table";
   else if (DIAGRAM_RE.test(prompt)) representation = "ascii";
   else if (LIST_RE.test(prompt)) representation = "bullets";
-  return { depth, representation, strict, wordLimit, shape, target: shape === "destructive-command" ? requestedTarget(prompt) : undefined };
+  const artifactMaxLines = shape === "implementation-result" && /\b(?:small|tiny|utility|helper)\b/i.test(prompt) ? 10 : undefined;
+  const cleanup = shape === "bounded-cleanup-command" ? requestedCleanup(prompt) : {};
+  return { depth, representation, strict, wordLimit, shape, target: ["destructive-command", "bounded-cleanup-command"].includes(shape) ? requestedTarget(prompt) : undefined, artifactMaxLines, ...cleanup };
 }
 
 function commentText(line) {
@@ -128,7 +140,7 @@ function contentFromTool(input) {
   return { content: typeof direct === "string" ? direct : "", previous: tool._existing_content ?? "" };
 }
 
-export function inspectArtifact(input = {}) {
+export function inspectArtifact(input = {}, contract = {}) {
   const isWriter = /^(?:Write|Edit|NotebookEdit)$/.test(input.tool_name ?? "") || /^mcp__.*__(?:write|create|update)/i.test(input.tool_name ?? "");
   if (!isWriter) return { allow: true };
   const { content, previous } = contentFromTool(input);
@@ -160,7 +172,15 @@ export function inspectArtifact(input = {}) {
     };
   }
 
-  if (/\.(?:md|mdx|txt|rst)$/i.test(input.tool_input?.file_path ?? "")) {
+  const filePath = input.tool_input?.file_path ?? input.tool_input?.path ?? "";
+  if (input.tool_name === "Write" && contract.artifactMaxLines && /\.[cm]?[jt]sx?$/i.test(filePath) && !previous) {
+    const nonEmptyLines = content.split(/\r?\n/).filter((line) => line.trim()).length;
+    if (nonEmptyLines > contract.artifactMaxLines) {
+      return { allow: false, reason: `Keep this small helper within ${contract.artifactMaxLines} non-empty lines by removing vertical ceremony and single-use temporaries; preserve behavior and readability.` };
+    }
+  }
+
+  if (/\.(?:md|mdx|txt|rst)$/i.test(filePath)) {
     const reduced = compress(content, { depth: "minimum", representation: "sentence" });
     if (reduced.changed && reduced.removedLines >= 2) {
       return { allow: false, reason: "Remove the preamble, narration, repetition, and closing filler from this document." };
@@ -304,6 +324,24 @@ function strictCompress(text, contract) {
       return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
     }
   }
+  if (contract.shape === "bounded-cleanup-command") {
+    const fence = String(text).match(/```[^\n]*\n([\s\S]*?)```/);
+    const commands = fence?.[1].trim().split(/\r?\n/).filter(Boolean) ?? [];
+    const warning = firstProseSentence(fence ? String(text).replace(fence[0], " ") : text);
+    const command = commands[0] ?? "";
+    const safe = /\bfind\s/.test(command)
+      && (!contract.target || command.includes(contract.target))
+      && /-(?:xdev|mount)\b/.test(command)
+      && /-type\s+f\b/.test(command)
+      && (!contract.filePattern || (/-name\s+/.test(command) && command.includes(contract.filePattern)))
+      && (contract.ageDays ? new RegExp(`-mtime\\s+\\+${contract.ageDays}\\b`).test(command) : /-mtime\s+\+\d+\b/.test(command))
+      && /-delete\b/.test(command)
+      && command.indexOf("-delete") > command.indexOf("-mtime");
+    if (commands.length === 1 && safe) {
+      const candidate = warning && DESTRUCTIVE_WARNING_RE.test(warning) ? `${commands[0]}\n${warning}` : commands[0];
+      return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
+    }
+  }
   if (contract.shape === "single-sentence-definition") {
     const sentence = firstProseSentence(text);
     const candidate = sentence.replace(/,\s+(?:making|ensuring|allowing|so|which|meaning)\b.*[.!?]$/i, ".");
@@ -325,6 +363,12 @@ function strictCompress(text, contract) {
     const candidate = reduced.text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && line !== "---").join(" ");
     const verification = verifyPreservation(text, candidate, extractProtected(text));
     if (candidate && verification.ok) return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
+  }
+  if (contract.shape === "implementation-result" && !WARNING_LINE_RE.test(text) && !UNCERTAINTY_RE.test(text)) {
+    const candidate = firstProseSentence(text);
+    if (candidate && verifyPreservation(text, candidate, extractProtected(text)).ok) {
+      return { text: candidate, changed: candidate !== text, removedLines: 0, fallback: false };
+    }
   }
   return compress(text, contract);
 }
@@ -353,9 +397,12 @@ function contextFor(contract) {
                 ? " After the change, report only what changed and any necessary warning or unresolved risk; do not restate the implementation."
                 : contract.shape === "destructive-command"
                   ? ` Use \`realpath -- TARGET\` to verify the exact target${contract.target ? ` ${contract.target}` : ""}, then \`rm -rf -- TARGET\`; never add sudo. State that deletion is irreversible. Do not replace path resolution with ls or generic advice.`
+                  : contract.shape === "bounded-cleanup-command"
+                    ? " Return one unfenced command with every requested scope and safety predicate before deletion, plus at most one short irreversible-action warning. Do not explain flags or add alternatives."
                   : "";
-  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-350 words unless the user supplied a different length. Before responding, silently check the length and delete repetition or secondary examples if it exceeds the limit." : "";
-  return `${depth}${constraint}${shape}${limit}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
+  const artifactBudget = contract.artifactMaxLines ? ` For this small helper, use at most ${contract.artifactMaxLines} non-empty source lines; inline single-use temporaries when readability is preserved.` : "";
+  const detailedBudget = contract.depth === "detailed" ? " Aim for 300-350 words unless the user supplied a different length. Before responding, silently check the length and delete repetition or secondary examples if it exceeds the limit. Do not invent API names, configuration keys, mechanisms, or quantitative claims. Privately challenge every exact mechanism, number, and absolute recommendation; remove claims you cannot verify, prefer established high-level facts, and state material uncertainty." : "";
+  return `${depth}${constraint}${shape}${limit}${artifactBudget}${detailedBudget}\nPreferred representation: ${contract.representation}. Follow the active Claudiator style.`;
 }
 
 function output(event, fields) {
@@ -479,7 +526,11 @@ export async function handleHook(input = {}, options = envOptions(), dependencie
         };
       } catch {}
     }
-    const decision = inspectArtifact(inspected);
+    let contract = deriveContract("");
+    try {
+      contract = dependencies.store?.loadContract?.(input.session_id) ?? contract;
+    } catch {}
+    const decision = inspectArtifact(inspected, contract);
     if (decision.allow) return {};
     return output(event, {
       permissionDecision: "deny",

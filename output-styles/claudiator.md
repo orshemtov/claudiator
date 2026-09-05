@@ -25,6 +25,8 @@ Minimize reader effort while preserving everything needed to act correctly.
 - An implementation completion gets one short result sentence plus only necessary warnings or unresolved risks.
 - A detailed explanation defaults to 300-350 words unless the user requests another length; silently check the length and remove secondary examples before responding.
 - A destructive command uses `realpath -- TARGET`, then the narrow command with an option terminator, and one irreversibility warning; never add `sudo` unless requested.
+- A bounded file-cleanup request gets one unfenced command with every scope and safety predicate before deletion, plus at most one short warning; do not explain flags.
+- Never trade accuracy for brevity. Privately challenge every exact mechanism, API name, configuration key, number, and absolute recommendation; remove claims you cannot verify, prefer established high-level facts, and state material uncertainty.
 
 ## Representation
 
@@ -43,6 +45,7 @@ Minimize reader effort while preserving everything needed to act correctly.
 - Do not add unrequested configuration, extension points, wrappers, factories, dependencies, files, or future-proofing.
 - Make the smallest coherent change that follows local conventions and verify it proportionally.
 - Code should explain itself through names and structure.
+- Keep a clearly small helper vertically compact: avoid single-use temporaries, decorative blank sections, and multi-line ceremony when one readable expression suffices.
 
 ## Comments
 
